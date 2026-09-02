@@ -1,6 +1,7 @@
 package com.example.smartgmail.ui.gmail
 
 import android.app.Activity
+import android.content.Context
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
@@ -20,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.edit
 
 import com.example.smartgmail.model.Email
 import com.example.smartgmail.context.EmailContextBuilder
@@ -29,6 +31,11 @@ import com.example.smartgmail.gmail.GmailMessageParser
 import com.example.smartgmail.ai.EmailAnalyzer
 import com.example.smartgmail.ai.LocalLLM
 import com.example.smartgmail.model.ModelManager
+import com.example.smartgmail.database.DatabaseProvider
+import com.example.smartgmail.database.AppDatabase
+import com.example.smartgmail.repository.EmailRepository
+import com.example.smartgmail.worker.GmailSyncScheduler
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -58,6 +65,16 @@ fun GmailScreen(
         ModelManager(context)
     }
 
+    val database = remember {
+        DatabaseProvider.getDatabase(context)
+    }
+
+    val emailRepository = remember {
+        EmailRepository(
+            database.emailDao()
+        )
+    }
+
     var gmailAccessToken by remember {
         mutableStateOf<String?>(null)
     }
@@ -77,6 +94,8 @@ fun GmailScreen(
     var modelLoading by remember {
         mutableStateOf(false)
     }
+
+
 
     val gmailAuthorizationLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartIntentSenderForResult()
@@ -183,6 +202,17 @@ fun GmailScreen(
 
                 if (gmailAccessToken != null) {
 
+                    context
+                        .getSharedPreferences(
+                            "gmail_auth",
+                            Context.MODE_PRIVATE
+                        )
+                        .edit {
+                            putString(
+                                "access_token",
+                                gmailAccessToken
+                            )
+                        }
                     status = "Gmail authorization successful"
 
                     Toast.makeText(
@@ -310,6 +340,45 @@ fun GmailScreen(
                             Spacer(
                                 modifier = Modifier.height(8.dp)
                             )
+//                            ----------------SAVE THE EMAIL------------------------------
+                            Button(
+                                enabled = emails.isNotEmpty(),
+                                onClick = {
+
+                                    scope.launch {
+
+                                        try {
+
+                                            val email = emails.first()
+
+                                            val saved =
+                                                emailRepository.saveIfNew(email)
+
+                                            if (saved) {
+
+                                                println(
+                                                    "FIRST EMAIL SUCCESSFULLY SAVED"
+                                                )
+
+                                            } else {
+
+                                                println(
+                                                    "FIRST EMAIL WAS ALREADY IN DATABASE"
+                                                )
+                                            }
+
+                                        } catch (e: Exception) {
+
+                                            println(
+                                                "EMAIL SAVE FAILED: ${e.message}"
+                                            )
+                                        }
+                                    }
+                                }
+                            ) {
+
+                                Text("Save Email")
+                            }
 
                             Text(
                                 text = email.subject,

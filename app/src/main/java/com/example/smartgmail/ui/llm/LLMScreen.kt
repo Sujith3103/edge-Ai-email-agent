@@ -87,6 +87,11 @@ fun LLMScreen(
         mutableStateOf(false)
     }
 
+
+    // =========================================================
+    // STARTUP STATE
+    // =========================================================
+
     var startupLoading by remember {
         mutableStateOf(true)
     }
@@ -137,10 +142,11 @@ fun LLMScreen(
                 ActivityResultContracts.OpenDocument()
         ) { uri: Uri? ->
 
+            // User cancelled
             if (uri == null) {
 
                 status =
-                    "No model selected"
+                    "Model selection cancelled"
 
                 return@rememberLauncherForActivityResult
             }
@@ -151,21 +157,17 @@ fun LLMScreen(
             modelLoaded = false
 
             status =
-                "Importing Qwen model..."
+                "Importing model..."
 
 
             scope.launch {
 
                 try {
 
-                    /*
-                     * Copy selected model into:
-                     *
-                     * app/files/models/
-                     *
-                     * ModelManager determines the
-                     * final filename.
-                     */
+                    // -----------------------------------------
+                    // IMPORT
+                    // -----------------------------------------
+
                     withContext(Dispatchers.IO) {
 
                         modelManager.importModel(uri)
@@ -175,17 +177,17 @@ fun LLMScreen(
                     modelInstalled = true
 
                     status =
-                        "Model imported successfully"
+                        "Model imported"
 
 
-                    /*
-                     * Automatically load the newly
-                     * imported model.
-                     */
+                    // -----------------------------------------
+                    // LOAD
+                    // -----------------------------------------
+
                     loading = true
 
                     status =
-                        "Loading Qwen model..."
+                        "Loading model..."
 
 
                     val modelPath =
@@ -210,10 +212,10 @@ fun LLMScreen(
 
                 } catch (e: Exception) {
 
-                    status =
-                        "Import/load failed: ${e.message}"
-
                     modelLoaded = false
+
+                    status =
+                        "Import failed: ${e.message}"
 
                 } finally {
 
@@ -225,65 +227,97 @@ fun LLMScreen(
 
 
     // =========================================================
-    // LOAD MODEL AT STARTUP
+    // LOAD EXISTING MODEL AT STARTUP
     // =========================================================
 
     LaunchedEffect(Unit) {
 
-        if (modelInstalled) {
-
-            status =
-                "Loading Qwen model..."
-
-            loading = true
-
-
-            try {
-
-                val modelPath =
-                    modelManager
-                        .modelFile()
-                        .absolutePath
-
-
-                withContext(Dispatchers.IO) {
-
-                    localLLM.loadModel(
-                        modelPath
-                    )
-                }
-
-
-                modelLoaded = true
-
-                status =
-                    "Ready"
-
-
-            } catch (e: Exception) {
-
-                modelLoaded = false
-
-                status =
-                    "Model loading failed: ${e.message}"
-
-            } finally {
-
-                loading = false
-                startupLoading = false
-            }
-
-
-        } else {
+        if (!modelInstalled) {
 
             /*
-             * No model installed.
+             * No model exists.
              *
-             * There is nothing to load.
+             * Stop startup loading and let the
+             * Import Model button be displayed.
              */
+
             status =
                 "Model not installed"
 
+            startupLoading = false
+
+            return@LaunchedEffect
+        }
+
+
+        // ---------------------------------------------
+        // MODEL EXISTS
+        // ---------------------------------------------
+
+        loading = true
+
+        status =
+            "Loading model..."
+
+
+        try {
+
+            val modelPath =
+                modelManager
+                    .modelFile()
+                    .absolutePath
+
+
+            println(
+                "========== MODEL STARTUP =========="
+            )
+
+            println(
+                "Model path = $modelPath"
+            )
+
+            println(
+                "Model exists = ${
+                    modelManager.isModelInstalled()
+                }"
+            )
+
+
+            withContext(Dispatchers.IO) {
+
+                localLLM.loadModel(
+                    modelPath
+                )
+            }
+
+
+            modelLoaded = true
+
+            status =
+                "Ready"
+
+
+            println(
+                "MODEL LOADED SUCCESSFULLY"
+            )
+
+
+        } catch (e: Exception) {
+
+            modelLoaded = false
+
+            status =
+                "Model loading failed: ${e.message}"
+
+
+            println(
+                "MODEL LOADING FAILED: ${e.message}"
+            )
+
+
+        } finally {
+
+            loading = false
             startupLoading = false
         }
     }
@@ -304,6 +338,7 @@ fun LLMScreen(
             generating ||
             !modelLoaded
         ) {
+
             return
         }
 
@@ -311,9 +346,7 @@ fun LLMScreen(
         input = ""
 
 
-        /*
-         * Add user message.
-         */
+        // Add user message
         messages =
             messages +
                     ChatMessage(
@@ -322,9 +355,7 @@ fun LLMScreen(
                     )
 
 
-        /*
-         * Add empty assistant message.
-         */
+        // Add empty assistant message
         messages =
             messages +
                     ChatMessage(
@@ -343,9 +374,10 @@ fun LLMScreen(
 
             try {
 
-                /*
-                 * Build conversation.
-                 */
+                // -----------------------------------------
+                // BUILD CONVERSATION
+                // -----------------------------------------
+
                 val conversation =
                     messages
                         .dropLast(1)
@@ -374,13 +406,13 @@ fun LLMScreen(
                 """.trimIndent()
 
 
-                var response =
-                    ""
+                var response = ""
 
 
-                /*
-                 * Generate response.
-                 */
+                // -----------------------------------------
+                // GENERATE
+                // -----------------------------------------
+
                 localLLM
                     .generate(
                         prompt = prompt,
@@ -391,9 +423,6 @@ fun LLMScreen(
                         response += token
 
 
-                        /*
-                         * Update the last assistant message.
-                         */
                         messages =
                             messages.dropLast(1) +
                                     ChatMessage(
@@ -413,9 +442,6 @@ fun LLMScreen(
                     "Generation failed: ${e.message}"
 
 
-                /*
-                 * Remove empty/failed assistant message.
-                 */
                 messages =
                     messages.dropLast(1)
 
@@ -462,10 +488,10 @@ fun LLMScreen(
                 when {
 
                     importing ->
-                        "Importing Qwen model..."
+                        "Importing model..."
 
                     loading ->
-                        "Loading Qwen model..."
+                        "Loading model..."
 
                     modelLoaded ->
                         "Qwen model ready"
@@ -474,40 +500,51 @@ fun LLMScreen(
                         "Model installed"
 
                     else ->
-                        "Model not installed"
+                        "AI model not available"
                 },
 
             modifier =
                 Modifier.padding(
-                    bottom = 8.dp
+                    bottom = 12.dp
                 )
         )
 
 
         // =====================================================
-        // MODEL BUTTONS
+        // MODEL SETUP
         // =====================================================
 
-        Row(
-            modifier =
-                Modifier.fillMaxWidth(),
-
-            horizontalArrangement =
-                Arrangement.spacedBy(8.dp)
-        ) {
-
+        if (!modelInstalled) {
 
             /*
-             * IMPORT / REPLACE MODEL
+             * MODEL DOES NOT EXIST
+             *
+             * Show import button.
              */
+
+            Text(
+                text =
+                    "Qwen model is not installed.",
+
+                modifier =
+                    Modifier.padding(
+                        bottom = 8.dp
+                    )
+            )
+
+
             Button(
 
                 enabled =
                     !importing &&
-                            !loading &&
-                            !generating,
+                            !loading,
 
                 onClick = {
+
+                    println(
+                        "OPENING MODEL FILE PICKER"
+                    )
+
 
                     filePicker.launch(
                         arrayOf(
@@ -518,89 +555,140 @@ fun LLMScreen(
                 },
 
                 modifier =
-                    Modifier.weight(1f)
+                    Modifier.fillMaxWidth()
             ) {
 
                 Text(
-                    if (modelInstalled) {
-                        "Replace Model"
+                    if (importing) {
+                        "Importing..."
                     } else {
-                        "Import Model"
+                        "Import Qwen Model"
                     }
                 )
             }
 
 
-            /*
-             * LOAD MODEL
-             */
-            if (
-                modelInstalled &&
-                !modelLoaded
+        } else {
+
+            // =================================================
+            // MODEL EXISTS
+            // =================================================
+
+            Row(
+
+                modifier =
+                    Modifier.fillMaxWidth(),
+
+                horizontalArrangement =
+                    Arrangement.spacedBy(8.dp)
             ) {
+
+
+                // ---------------------------------------------
+                // REPLACE MODEL
+                // ---------------------------------------------
 
                 Button(
 
                     enabled =
-                        !loading &&
-                                !importing,
+                        !importing &&
+                                !loading &&
+                                !generating,
 
                     onClick = {
 
-                        loading = true
-
-                        status =
-                            "Loading Qwen model..."
-
-
-                        scope.launch {
-
-                            try {
-
-                                val modelPath =
-                                    modelManager
-                                        .modelFile()
-                                        .absolutePath
+                        println(
+                            "OPENING MODEL FILE PICKER"
+                        )
 
 
-                                withContext(
-                                    Dispatchers.IO
-                                ) {
+                        filePicker.launch(
+                            arrayOf(
+                                "application/octet-stream",
+                                "*/*"
+                            )
+                        )
+                    },
 
-                                    localLLM.loadModel(
-                                        modelPath
-                                    )
-                                }
-
-
-                                modelLoaded = true
-
-                                status =
-                                    "Ready"
-
-
-                            } catch (e: Exception) {
-
-                                modelLoaded = false
-
-                                status =
-                                    "Model loading failed: ${e.message}"
-
-                            } finally {
-
-                                loading = false
-                            }
-                        }
-                    }
+                    modifier =
+                        Modifier.weight(1f)
                 ) {
 
                     Text(
-                        if (loading) {
-                            "Loading..."
-                        } else {
-                            "Load Model"
-                        }
+                        "Replace Model"
                     )
+                }
+
+
+                // ---------------------------------------------
+                // LOAD MODEL
+                // ---------------------------------------------
+
+                if (!modelLoaded) {
+
+                    Button(
+
+                        enabled =
+                            !loading &&
+                                    !importing,
+
+                        onClick = {
+
+                            loading = true
+
+                            status =
+                                "Loading model..."
+
+
+                            scope.launch {
+
+                                try {
+
+                                    val modelPath =
+                                        modelManager
+                                            .modelFile()
+                                            .absolutePath
+
+
+                                    withContext(
+                                        Dispatchers.IO
+                                    ) {
+
+                                        localLLM.loadModel(
+                                            modelPath
+                                        )
+                                    }
+
+
+                                    modelLoaded = true
+
+                                    status =
+                                        "Ready"
+
+
+                                } catch (e: Exception) {
+
+                                    modelLoaded = false
+
+                                    status =
+                                        "Model loading failed: ${e.message}"
+
+                                } finally {
+
+                                    loading = false
+                                }
+                            }
+                        }
+                    ) {
+
+                        Text(
+                            if (loading) {
+                                "Loading..."
+                            } else {
+                                "Load Model"
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -613,7 +701,7 @@ fun LLMScreen(
 
 
         // =====================================================
-        // STARTUP
+        // STARTUP SCREEN
         // =====================================================
 
         if (startupLoading) {

@@ -8,7 +8,8 @@ class ModelManager(private val context: Context) {
 
     companion object {
         private const val MODEL_NAME =
-            "qwen2.5-1.5b-instruct-q4_k_m.gguf"
+            "qwen2.5-1.5b-instruct-q4_0.gguf"
+//            "qwen2.5-1.5b-instruct-q4_k_m.gguf"
 //            "qwen2.5-3b-instruct-q4_k_m.gguf"
     }
 
