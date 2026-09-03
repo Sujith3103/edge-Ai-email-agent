@@ -20,12 +20,21 @@ class LocalLLM(context: Context) {
 
     fun generate(
         prompt: String,
-        maxTokens: Int = 4096
+        maxTokens: Int
     ): Flow<String> {
         return engine.sendUserPrompt(
             message = prompt,
             predictLength = maxTokens
         )
+    }
+
+    suspend fun bench(
+        pp: Int,
+        tg: Int,
+        pl: Int,
+        nr: Int = 1
+    ): String {
+        return engine.bench(pp, tg, pl, nr)
     }
 
     val state

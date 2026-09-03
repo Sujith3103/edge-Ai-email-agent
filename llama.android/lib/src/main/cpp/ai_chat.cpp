@@ -87,6 +87,11 @@ static llama_context *init_context(llama_model *model, const int n_ctx = DEFAULT
     // Context parameters setup
     llama_context_params ctx_params = llama_context_default_params();
     const int trained_context_size = llama_model_n_ctx_train(model);
+    LOGi(
+            "MODEL TRAINED CONTEXT = %d | REQUESTED CONTEXT = %d",
+            trained_context_size,
+            n_ctx
+    );
     if (n_ctx > trained_context_size) {
         LOGw("%s: Model was trained with only %d context size! Enforcing %d context size...",
              __func__, trained_context_size, n_ctx);

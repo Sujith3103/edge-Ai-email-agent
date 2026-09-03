@@ -5,6 +5,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 
 class GmailApi {
 
@@ -16,7 +17,7 @@ class GmailApi {
 
         val queryParameter =
             if (query != null) {
-                "&q=" + java.net.URLEncoder.encode(
+                "&q=" + URLEncoder.encode(
                     query,
                     "UTF-8"
                 )
@@ -58,8 +59,9 @@ class GmailApi {
                         ?.bufferedReader()
                         ?.use { it.readText() }
 
-                throw Exception(
-                    "Gmail API error $responseCode: $error"
+                throw GmailApiException(
+                    responseCode,
+                    error
                 )
             }
 
@@ -88,8 +90,11 @@ class GmailApi {
 
                 result.add(
                     GmailMessage(
-                        id = message.getString("id"),
-                        threadId = message.getString("threadId")
+                        id =
+                            message.getString("id"),
+
+                        threadId =
+                            message.getString("threadId")
                     )
                 )
             }
@@ -101,6 +106,8 @@ class GmailApi {
             connection.disconnect()
         }
     }
+
+
     suspend fun getMessage(
         accessToken: String,
         messageId: String
@@ -139,8 +146,9 @@ class GmailApi {
                         ?.bufferedReader()
                         ?.use { it.readText() }
 
-                throw Exception(
-                    "Gmail API error $responseCode: $error"
+                throw GmailApiException(
+                    responseCode,
+                    error
                 )
             }
 
@@ -155,7 +163,16 @@ class GmailApi {
     }
 }
 
+
 data class GmailMessage(
     val id: String,
     val threadId: String
+)
+
+
+class GmailApiException(
+    val code: Int,
+    message: String?
+) : Exception(
+    "Gmail API error $code: $message"
 )

@@ -62,28 +62,75 @@ supported by the email.
 Do not invent facts.
 Do not guess missing dates, times, locations, or actions.
 
-
 1. PRIORITY
 
+Determine priority using the following rules IN THIS EXACT ORDER.
+
+LOW:
+First check whether the email is primarily:
+- an advertisement
+- a promotion
+- a sale or discount
+- a marketing email
+- a newsletter
+- a product recommendation
+- a routine automated notification
+- an email requiring no meaningful action
+
+If YES, priority MUST be LOW.
+
+Examples:
+
+"Weekend Sale - Up to 40% off"
+→ LOW
+
+"50% discount on selected products"
+→ LOW
+
+"Shop our new collection"
+→ LOW
+
+"Newsletter: This week's updates"
+→ LOW
+
+
 HIGH:
-Use HIGH if the email contains:
-- a deadline
-- a payment due
-- an urgent request
+Only use HIGH if the email contains a genuine time-sensitive requirement
+for the user, such as:
+- a deadline the user must meet
+- a payment that is due
+- an urgent request requiring action
 - a meeting, appointment, interview, exam, or class at a specific time
 - another clearly time-sensitive requirement
 
+A promotional email MUST NOT be HIGH merely because:
+- the promotion ends soon
+- the email mentions a sale date
+- the email contains a discount
+- the email says "limited time"
+- the email says "act now"
+- the email says "ends today"
+
+A marketing deadline is NOT a user deadline.
+
+For example:
+
+"Sale ends September 4"
+→ LOW
+
+"Offer valid until Friday"
+→ LOW
+
+"Please submit the payment by Friday"
+→ HIGH
+
+
 MEDIUM:
-Use MEDIUM if the email is important or useful but not urgent.
+Use MEDIUM if the email is important or useful to the user
+but does not contain a genuine urgent requirement.
 
-LOW:
-Use LOW for:
-- advertisements
-- promotions
-- newsletters
-- routine automated notifications
-- emails requiring no meaningful action
-
+If the email does not clearly qualify as HIGH or LOW,
+use MEDIUM.
 
 2. SUMMARY
 
@@ -304,17 +351,17 @@ $context
 //""".trimIndent()
 
         Log.d(
-            "SmartGmail",
+            "workflow",
             "3. PROMPT BUILT"
         )
 
         Log.d(
-            "SmartGmail",
+            "workflow",
             "Prompt length = ${prompt.length}"
         )
 
         Log.d(
-            "SmartGmail",
+            "workflow",
             "Prompt ending = ${prompt.takeLast(500)}"
         )
 
@@ -326,7 +373,7 @@ $context
         var response = ""
 
         Log.d(
-            "SmartGmail",
+            "workflow",
             "4. CALLING QWEN"
         )
 
@@ -354,7 +401,7 @@ $context
                 if (response.length <= token.length + 1) {
 
                     Log.d(
-                        "SmartGmail",
+                        "workflow",
                         "5. FIRST TOKEN RECEIVED"
                     )
                 }
@@ -366,22 +413,22 @@ $context
          */
 
         Log.d(
-            "SmartGmail",
+            "workflow",
             "6. QWEN FINISHED"
         )
 
         Log.d(
-            "SmartGmail",
+            "workflow",
             "Raw response length = ${response.length}"
         )
 
         Log.d(
-            "SmartGmail",
+            "workflow",
             "RAW QWEN RESPONSE:"
         )
 
         Log.d(
-            "SmartGmail",
+            "workflow",
             response
         )
 
@@ -392,7 +439,7 @@ $context
          */
 
         Log.d(
-            "SmartGmail",
+            "workflow",
             "7. PARSING RESPONSE"
         )
 
@@ -404,32 +451,32 @@ $context
 
 
         Log.d(
-            "SmartGmail",
+            "workflow",
             "8. ANALYSIS COMPLETE"
         )
 
         Log.d(
-            "SmartGmail",
+            "workflow",
             "Priority = ${analysis.priority}"
         )
 
         Log.d(
-            "SmartGmail",
+            "workflow",
             "Summary = ${analysis.summary}"
         )
 
         Log.d(
-            "SmartGmail",
+            "workflow",
             "Action items = ${analysis.actionItems}"
         )
 
         Log.d(
-            "SmartGmail",
+            "workflow",
             "Deadlines = ${analysis.deadlines}"
         )
 
         Log.d(
-            "SmartGmail",
+            "workflow",
             "Calendar events = ${analysis.calendarEvents}"
         )
 
