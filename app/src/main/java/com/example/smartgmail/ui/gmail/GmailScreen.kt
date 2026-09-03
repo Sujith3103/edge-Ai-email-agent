@@ -196,14 +196,14 @@ fun GmailScreen(
          */
 
     }
-    Button(
-        enabled = aiReady,
-        onClick = {
-            CoroutineScope(Dispatchers.IO).launch {
-                runLLMBenchmark(aiManager.getLLM())
-            }
-        }
-    ) {
-        Text("Run LLM Benchmark")
-    }
+//    Button(
+//        enabled = aiReady,
+//        onClick = {
+//            CoroutineScope(Dispatchers.IO).launch {
+//                runLLMBenchmark(aiManager.getLLM())
+//            }
+//        }
+//    ) {
+//        Text("Run LLM Benchmark")
+//    }
 }

@@ -148,6 +148,9 @@ extern "C"
 JNIEXPORT jstring JNICALL
 Java_com_arm_aichat_internal_InferenceEngineImpl_benchModel(JNIEnv *env, jobject /*unused*/, jint pp, jint tg,
                                                       jint pl, jint nr) {
+    LOGi("SMARTGMAIL BENCHMARK FIX ACTIVE");
+    LOGi("Start benchmark (pp: %d, tg: %d, pl: %d, nr: %d)", pp, tg, pl, nr);
+
     auto *context = init_context(g_model, pp);
     if (!context) {
         const auto *const err_msg = "Fail to init_context! Bench aborted.";
@@ -168,36 +171,47 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_benchModel(JNIEnv *env, jobject
     for (nri = 0; nri < nr; nri++) {
         LOGi("Benchmark prompt processing (pp = %d)", pp);
 
-        common_batch_clear(g_batch);
-
-        const int n_tokens = pp;
-        for (i = 0; i < n_tokens; i++) {
-            common_batch_add(g_batch, 0, i, {0}, false);
-        }
-
-        g_batch.logits[g_batch.n_tokens - 1] = true;
         llama_memory_clear(llama_get_memory(context), false);
 
         const auto t_pp_start = ggml_time_us();
-        if (llama_decode(context, g_batch) != 0) {
-            LOGe("llama_decode() failed during prompt processing");
+
+        // Process prompt in batches of BATCH_SIZE (512)
+        for (i = 0; i < pp; i += BATCH_SIZE) {
+            const int n_batch_cur = std::min(pp - i, BATCH_SIZE);
+            common_batch_clear(g_batch);
+
+            for (j = 0; j < n_batch_cur; j++) {
+                const int token_pos = i + j;
+                const bool want_logit = (token_pos == pp - 1);
+                common_batch_add(g_batch, 0, token_pos, {0}, want_logit);
+            }
+
+            if (llama_decode(context, g_batch) != 0) {
+                LOGe("llama_decode() failed during prompt processing");
+                break;
+            }
         }
         const auto t_pp_end = ggml_time_us();
 
         // bench text generation
 
-        LOGi("Benchmark text generation (tg = %d)", tg);
+        LOGi("Benchmark text generation (tg = %d, pl = %d)", tg, pl);
 
         llama_memory_clear(llama_get_memory(context), false);
         const auto t_tg_start = ggml_time_us();
         for (i = 0; i < tg; i++) {
-            common_batch_clear(g_batch);
-            for (j = 0; j < pl; j++) {
-                common_batch_add(g_batch, 0, i, {j}, true);
-            }
+            // Process text generation in batches of BATCH_SIZE (512) if pl is large
+            for (int k = 0; k < pl; k += BATCH_SIZE) {
+                const int n_batch_cur = std::min(pl - k, BATCH_SIZE);
+                common_batch_clear(g_batch);
+                for (j = 0; j < n_batch_cur; j++) {
+                    common_batch_add(g_batch, 0, i, {k + j}, true);
+                }
 
-            if (llama_decode(context, g_batch) != 0) {
-                LOGe("llama_decode() failed during text generation");
+                if (llama_decode(context, g_batch) != 0) {
+                    LOGe("llama_decode() failed during text generation");
+                    break;
+                }
             }
         }
         const auto t_tg_end = ggml_time_us();
@@ -216,8 +230,16 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_benchModel(JNIEnv *env, jobject
         pp_std += speed_pp * speed_pp;
         tg_std += speed_tg * speed_tg;
 
-        LOGi("pp %f t/s, tg %f t/s", speed_pp, speed_tg);
-    }
+        LOGi(
+                "BENCH RESULT | pp=%d | pp_time=%.3f ms | pp_speed=%.3f tok/s | "
+                "tg=%d | tg_time=%.3f ms | tg_speed=%.3f tok/s",
+                pp,
+                t_pp * 1000.0,
+                speed_pp,
+                tg,
+                t_tg * 1000.0,
+                speed_tg
+        );    }
 
     llama_free(context);
 
@@ -249,6 +271,7 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_benchModel(JNIEnv *env, jobject
            << backend << " | tg " << tg << " | " << tg_avg << " ± " << tg_std << " |\n";
     return env->NewStringUTF(result.str().c_str());
 }
+
 
 
 /**

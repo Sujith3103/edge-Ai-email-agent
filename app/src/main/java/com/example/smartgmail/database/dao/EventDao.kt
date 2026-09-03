@@ -14,6 +14,11 @@ interface EventDao {
         event: EventEntity
     )
 
+    @Insert
+    suspend fun insertEvents(
+        events: List<EventEntity>
+    )
+
     @Query(
         "SELECT * FROM events ORDER BY date ASC, startTime ASC"
     )

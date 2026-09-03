@@ -15,6 +15,11 @@ interface TaskDao {
         task: TaskEntity
     )
 
+    @Insert
+    suspend fun insertTasks(
+        tasks: List<TaskEntity>
+    )
+
     @Query(
         "SELECT * FROM tasks WHERE completed = 0"
     )
