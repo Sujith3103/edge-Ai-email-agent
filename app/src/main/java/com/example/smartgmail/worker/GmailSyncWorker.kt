@@ -17,6 +17,7 @@ import com.example.smartgmail.context.EmailContextBuilder
 import com.example.smartgmail.gmail.GmailMessageParser
 import com.example.smartgmail.model.Email
 import com.example.smartgmail.repository.EmailRepository
+import com.example.smartgmail.repository.EmailAnalysisRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -58,6 +59,11 @@ class GmailSyncWorker(
             val emailRepository =
                 EmailRepository(
                     database.emailDao()
+                )
+
+            val emailAnalysisRepository =
+                EmailAnalysisRepository(
+                    database
                 )
 
             val emailAnalyzer = EmailAnalyzer(localLLM)
@@ -228,13 +234,31 @@ class GmailSyncWorker(
                     // AI WORKFLOW
                     // -----------------------------------------
 
-                    val analyzedEmail =
-                        emailAnalyzer.analyze(email)
+                    try {
+                        val analyzedEmail =
+                            emailAnalyzer.analyze(email)
 
-                    Log.d(
-                        "workflow",
-                        analyzedEmail.toString()
-                    )
+                        emailAnalysisRepository.saveAnalysis(
+                            analyzedEmail
+                        )
+
+                        Log.d(
+                            "workflow",
+                            "ANALYSIS SAVED: ${email.id}"
+                        )
+                    } catch (e: Exception) {
+                        Log.e(
+                            "workflow",
+                            "ANALYSIS FAILED: ${email.id}",
+                            e
+                        )
+
+                        try {
+                            emailAnalysisRepository.saveFailedAnalysis(email.id)
+                        } catch (inner: Exception) {
+                            Log.e("workflow", "FAILED to save failure status", inner)
+                        }
+                    }
 
                 } catch (e: Exception) {
 

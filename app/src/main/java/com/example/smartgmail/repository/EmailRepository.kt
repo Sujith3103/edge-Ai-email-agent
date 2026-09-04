@@ -2,6 +2,7 @@ package com.example.smartgmail.repository
 
 import com.example.smartgmail.database.dao.EmailDao
 import com.example.smartgmail.database.entity.EmailEntity
+import com.example.smartgmail.database.entity.InboxEmail
 import com.example.smartgmail.model.Email
 import kotlinx.coroutines.flow.Flow
 
@@ -51,6 +52,12 @@ class EmailRepository(
             Flow<List<EmailEntity>> {
 
         return emailDao.getAllEmails()
+    }
+
+
+    fun getInboxEmails(): Flow<List<InboxEmail>> {
+
+        return emailDao.getInboxEmails()
     }
 
 

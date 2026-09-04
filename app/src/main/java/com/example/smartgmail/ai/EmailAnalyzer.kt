@@ -56,28 +56,93 @@ class EmailAnalyzer(
         val prompt = """
 You are SmartGmail's email analysis engine.
 
-Read the email carefully and extract only information explicitly
-supported by the email.
+Analyze the email and return ONLY valid JSON.
 
-Do not invent facts.
-Do not guess missing dates, times, locations, or actions.
+Use ONLY information explicitly present in the email.
+Never invent, assume, or guess information.
 
+==================================================
 1. PRIORITY
+==================================================
 
-Determine priority using the following rules IN THIS EXACT ORDER.
+Choose exactly ONE priority:
 
-LOW:
-First check whether the email is primarily:
-- an advertisement
-- a promotion
-- a sale or discount
-- a marketing email
-- a newsletter
-- a product recommendation
-- a routine automated notification
-- an email requiring no meaningful action
+HIGH
+MEDIUM
+LOW
 
-If YES, priority MUST be LOW.
+FOLLOW THESE STEPS IN ORDER.
+
+STEP 1 — HIGH
+
+Ask:
+
+"Does the user need to do something important or time-sensitive?"
+
+If YES, priority = HIGH.
+
+This includes:
+
+- a deadline the user must meet
+- a report, assignment, application, or form that must be submitted
+- a payment that must be made
+- an urgent request
+- an interview
+- an exam
+- a class
+- a meeting or appointment at a specific time
+- another genuine time-sensitive obligation
+
+Examples:
+
+"Submit the report by September 4 at 5 PM."
+→ HIGH
+
+"Please complete the application by Friday."
+→ HIGH
+
+"Payment is due September 10."
+→ HIGH
+
+"Your interview is September 8 at 2 PM."
+→ HIGH
+
+"Project review is September 5 at 10 AM."
+→ HIGH
+
+
+IMPORTANT:
+
+If an email contains a genuine user deadline or obligation,
+it MUST NOT be LOW.
+
+A deadline or urgent obligation takes priority over the fact
+that the email may be a reminder or automated notification.
+
+Example:
+
+"Reminder: submit your project report by September 4 at 5 PM."
+→ HIGH
+
+NOT LOW.
+
+
+STEP 2 — LOW
+
+Only choose LOW if the email does NOT contain a genuine
+user obligation or urgent requirement.
+
+LOW includes emails that are primarily:
+
+- advertisements
+- promotions
+- sales
+- discounts
+- marketing
+- newsletters
+- product recommendations
+- routine automated notifications
+- information requiring no meaningful action
 
 Examples:
 
@@ -94,97 +159,130 @@ Examples:
 → LOW
 
 
-HIGH:
-Only use HIGH if the email contains a genuine time-sensitive requirement
-for the user, such as:
-- a deadline the user must meet
-- a payment that is due
-- an urgent request requiring action
-- a meeting, appointment, interview, exam, or class at a specific time
-- another clearly time-sensitive requirement
+A promotional date is NOT a user deadline.
 
-A promotional email MUST NOT be HIGH merely because:
-- the promotion ends soon
-- the email mentions a sale date
-- the email contains a discount
-- the email says "limited time"
-- the email says "act now"
-- the email says "ends today"
+Examples:
 
-A marketing deadline is NOT a user deadline.
-
-For example:
-
-"Sale ends September 4"
+"Sale ends September 4."
 → LOW
 
-"Offer valid until Friday"
+"Offer valid until Friday."
 → LOW
 
-"Please submit the payment by Friday"
-→ HIGH
+"Limited time offer."
+→ LOW
+
+"Act now before the offer expires."
+→ LOW
 
 
-MEDIUM:
-Use MEDIUM if the email is important or useful to the user
-but does not contain a genuine urgent requirement.
+STEP 3 — MEDIUM
 
-If the email does not clearly qualify as HIGH or LOW,
-use MEDIUM.
+If the email is important or useful but is neither:
 
+- a genuine urgent/user obligation
+NOR
+- promotional/routine/no-action content
+
+then priority = MEDIUM.
+
+Examples:
+
+"Here are the updated project requirements."
+→ MEDIUM
+
+"Your manager shared the new project guidelines."
+→ MEDIUM
+
+"Meeting notes from today's discussion."
+→ MEDIUM
+
+
+==================================================
 2. SUMMARY
+==================================================
 
-Write one short sentence explaining what the email is about.
+Write ONE short sentence describing what the email is about.
+
+Do not add information that is not in the email.
 
 
+==================================================
 3. ACTION ITEMS
+==================================================
 
-List actions the user is explicitly asked or clearly expected to perform.
+List actions the user is explicitly asked or clearly expected
+to perform.
 
-Do not invent actions.
+Examples:
 
-Do not create an action from a conditional statement.
+"Submit the report by Friday."
+→ "Submit the report"
+
+"Please contact me before Friday."
+→ "Contact me"
+
+"Prepare the presentation for the review."
+→ "Prepare the presentation"
+
+Do NOT invent actions.
+
+Do NOT turn optional or conditional statements into actions.
 
 Example:
+
 "If you have questions, contact me."
 → no action item
 
-Example:
-"Please contact me before Friday."
-→ action item
 
-
+==================================================
 4. DEADLINES
+==================================================
 
-A deadline means something the user must COMPLETE BY a date or time.
+A DEADLINE is something the USER MUST COMPLETE BY a specific
+date or time.
 
 Examples:
+
 "Submit the report by September 4 at 5 PM."
 → deadline
 
 "Payment is due September 10."
 → deadline
 
-A meeting or appointment is NOT a deadline.
-
-For each deadline return:
-- description
-- date
-- time
+"Application must be completed by Friday."
+→ deadline
 
 
+A MEETING, APPOINTMENT, INTERVIEW, EXAM, OR CLASS is NOT a deadline.
+
+For example:
+
+"Project review is September 5 from 10 AM to 11 AM."
+→ NOT a deadline
+
+
+==================================================
 5. CALENDAR EVENTS
+==================================================
 
-A calendar event is something that HAPPENS at a specific date or time.
+A CALENDAR EVENT is something that HAPPENS at a specific
+date or time.
 
 Examples:
+
 "Project review is September 5 from 10 AM to 11 AM."
 → calendar event
 
 "Your interview is September 8 at 2 PM."
 → calendar event
 
-For each event return:
+"Class starts at 9 AM on Monday."
+→ calendar event
+
+
+For every calendar event return:
+
 - title
 - date
 - startTime
@@ -192,16 +290,26 @@ For each event return:
 - location
 - description
 
-Do not put deadlines into calendarEvents.
 
-Do not duplicate the same event in deadlines.
+IMPORTANT:
+
+A meeting belongs in calendarEvents.
+
+A deadline belongs in deadlines.
+
+Do NOT put a meeting in deadlines.
+
+Do NOT put a deadline in calendarEvents.
+
+If an email contains both a deadline and a meeting,
+extract them separately.
 
 
+==================================================
 6. DATE FORMAT
+==================================================
 
-THIS IS IMPORTANT.
-
-Always convert dates to EXACTLY:
+Convert every known date to:
 
 YYYY-MM-DD
 
@@ -217,15 +325,13 @@ December 1, 2026
 → 2026-12-01
 
 
+==================================================
 7. TIME FORMAT
+==================================================
 
-THIS IS IMPORTANT.
-
-Always convert times to EXACTLY:
+Convert every known time to 24-hour format:
 
 HH:MM
-
-Use the 24-hour clock.
 
 Examples:
 
@@ -250,7 +356,7 @@ Examples:
 
 For a time range:
 
-10:00 AM to 11:00 AM
+"10:00 AM to 11:00 AM"
 
 return:
 
@@ -260,44 +366,55 @@ endTime = "11:00"
 
 NEVER return:
 
-"September 4, 2026 at 5:00 PM"
-
-NEVER return:
-
 "5:00 PM"
 
 NEVER return:
 
 "10:00 AM to 11:00 AM"
 
-Return only the required formatted values.
+NEVER include the date inside a time field.
 
 
+==================================================
 8. UNKNOWN VALUES
+==================================================
 
-If the email does not provide a date, return:
+If information is not explicitly provided, use null.
 
+Unknown date:
 null
 
-If the email does not provide a time, return:
-
+Unknown time:
 null
 
-If the email does not provide an end time, return:
+Unknown end time:
+null
 
+Unknown location:
+null
+
+Unknown description:
 null
 
 Never guess missing information.
 
 
+==================================================
 9. OUTPUT
+==================================================
 
 Return ONLY valid JSON.
+
+Do NOT use Markdown.
+
+Do NOT use ```json.
+
+Do NOT write explanations before or after the JSON.
 
 Use exactly this structure:
 
 {
-  "priority": "",
+  "priority": "HIGH",
   "summary": "",
   "actionItems": [],
   "deadlines": [
@@ -320,21 +437,51 @@ Use exactly this structure:
 }
 
 
-FINAL RULES:
+==================================================
+FINAL PRIORITY CHECK
+==================================================
 
-- Dates MUST be YYYY-MM-DD.
-- Times MUST be HH:MM.
-- Use 24-hour time.
-- Use null for unknown values.
-- Use [] when there are no items.
-- Never invent information.
-- Return JSON only.
+Before returning the JSON, check:
+
+1. Is the user required to do something by a date/time?
+   → HIGH
+
+2. Is there another genuine urgent or time-sensitive obligation?
+   → HIGH
+
+3. Is the email only promotional, marketing, newsletter,
+   or routine/no-action content?
+   → LOW
+
+4. Otherwise:
+   → MEDIUM
+
+
+FINAL CHECK FOR THIS DISTINCTION:
+
+"Submit your report by Friday."
+→ HIGH
+
+"Reminder to submit your report by Friday."
+→ HIGH
+
+"Sale ends Friday."
+→ LOW
+
+"Newsletter with this week's updates."
+→ LOW
+
+"Project meeting Friday at 10 AM."
+→ HIGH + calendar event
+
+"Project requirements have been updated."
+→ MEDIUM
+
 
 EMAIL:
 
 $context
-""".trimIndent()//        val prompt = """
-//    Analyze this email.
+""".trimIndent()//    Analyze this email.
 //
 //    Return ONLY JSON.
 //
@@ -372,49 +519,60 @@ $context
 
         var response = ""
 
+        val inferenceStartTime =
+            System.currentTimeMillis()
+
+        var firstTokenReceived = false
+
         Log.d(
             "workflow",
             "4. CALLING QWEN"
         )
 
+        val responseBuilder =
+            StringBuilder()
 
         localLLM
             .generate(
                 prompt = prompt,
-
-                /*
-                 * We don't need 512 tokens
-                 * for this structured response.
-                 */
                 maxTokens = 512
             )
             .collect { token ->
 
-                response += token
+                responseBuilder.append(token)
 
-                /*
-                 * Don't log every token yet.
-                 * Just confirm that generation
-                 * has started.
-                 */
+                response = responseBuilder.toString()
 
-                if (response.length <= token.length + 1) {
+                if (!firstTokenReceived) {
+
+                    firstTokenReceived = true
+
+                    val firstTokenTime =
+                        System.currentTimeMillis() - inferenceStartTime
 
                     Log.d(
                         "workflow",
-                        "5. FIRST TOKEN RECEIVED"
+                        "5. FIRST TOKEN RECEIVED after ${firstTokenTime} ms"
                     )
                 }
             }
 
-
-        /*
-         * Qwen finished.
-         */
+        val totalInferenceTime =
+            System.currentTimeMillis() - inferenceStartTime
 
         Log.d(
             "workflow",
             "6. QWEN FINISHED"
+        )
+
+        Log.d(
+            "workflow",
+            "Inference time = ${totalInferenceTime} ms"
+        )
+
+        Log.d(
+            "workflow",
+            "Response length = ${response.length}"
         )
 
         Log.d(

@@ -34,4 +34,7 @@ interface TaskDao {
     suspend fun updateTask(
         task: TaskEntity
     )
+
+    @Query("DELETE FROM tasks WHERE emailId = :emailId")
+    suspend fun deleteTasksByEmailId(emailId: String)
 }

@@ -23,4 +23,7 @@ interface EventDao {
         "SELECT * FROM events ORDER BY date ASC, startTime ASC"
     )
     fun getAllEvents(): Flow<List<EventEntity>>
+
+    @Query("DELETE FROM events WHERE emailId = :emailId")
+    suspend fun deleteEventsByEmailId(emailId: String)
 }

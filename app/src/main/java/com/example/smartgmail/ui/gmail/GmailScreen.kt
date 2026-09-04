@@ -15,17 +15,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.example.smartgmail.SmartGmailApplication
 
-import com.example.smartgmail.model.Email
 import com.example.smartgmail.gmail.GmailApi
 
-import com.example.smartgmail.ai.runLLMBenchmark
-
 import com.example.smartgmail.repository.EmailRepository
+import com.example.smartgmail.database.entity.InboxEmail
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import kotlinx.coroutines.CoroutineScope
-
 import kotlinx.coroutines.Dispatchers
-
-
 import kotlinx.coroutines.launch
 
 @Composable
@@ -63,6 +64,12 @@ fun GmailScreen(
         )
     }
 
+    val viewModel: InboxViewModel = viewModel(
+        factory = InboxViewModel.Factory(emailRepository)
+    )
+
+    val inboxEmails by viewModel.inboxEmails.collectAsState()
+
     var gmailAccessToken by remember {
         mutableStateOf(
             gmailManager.getAccessToken()
@@ -71,10 +78,6 @@ fun GmailScreen(
 
     var status by remember {
         mutableStateOf("Gmail not connected")
-    }
-
-    var emails by remember {
-        mutableStateOf<List<Email>>(emptyList())
     }
 
     val gmailAuthorizationLauncher =
@@ -174,7 +177,8 @@ fun GmailScreen(
     }
 
     LazyColumn(
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(bottom = 16.dp)
     ) {
 
         /*
@@ -182,28 +186,99 @@ fun GmailScreen(
          */
 
         item {
-
             Text(
                 text = status,
-                modifier = Modifier.padding(
-                    bottom = 8.dp
-                )
+                modifier = Modifier.padding(16.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.secondary
             )
         }
 
-        /*
-         * LOAD GMAIL BUTTON
-         */
-
+        items(
+            items = inboxEmails,
+            key = { it.id }
+        ) { email ->
+            GmailEmailCard(email = email)
+        }
     }
-//    Button(
-//        enabled = aiReady,
-//        onClick = {
-//            CoroutineScope(Dispatchers.IO).launch {
-//                runLLMBenchmark(aiManager.getLLM())
-//            }
-//        }
-//    ) {
-//        Text("Run LLM Benchmark")
-//    }
+}
+
+@Composable
+fun GmailEmailCard(
+    email: InboxEmail,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp, horizontal = 8.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = email.sender.substringBefore(" <"),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+                Text(
+                    text = email.date.substringBefore(" "),
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = email.subject,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                maxLines = 2
+            )
+
+            if (email.summary != null && email.summary.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = email.summary,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Priority Tag
+            val priorityText = when {
+                email.analysisStatus == "FAILED" -> "Analysis failed"
+                email.priority != null -> email.priority.uppercase()
+                else -> "Analyzing..."
+            }
+
+            val priorityColor = when (email.priority?.uppercase()) {
+                "HIGH" -> Color(0xFFD32F2F) // Red
+                "MEDIUM" -> Color(0xFFF57C00) // Orange
+                "LOW" -> Color(0xFF388E3C) // Green
+                else -> Color.Gray
+            }
+
+            Surface(
+                color = priorityColor.copy(alpha = 0.1f),
+                shape = MaterialTheme.shapes.small
+            ) {
+                Text(
+                    text = priorityText,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    color = priorityColor,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
 }
