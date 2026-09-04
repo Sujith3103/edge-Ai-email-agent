@@ -25,10 +25,10 @@ static std::string join(const std::vector<T> &values, const std::string &delim) 
  * LLama resources: context, model, batch and sampler
  */
 constexpr int   N_THREADS_MIN           = 2;
-constexpr int   N_THREADS_MAX           = 4;
+constexpr int   N_THREADS_MAX           = 2;
 constexpr int   N_THREADS_HEADROOM      = 2;
 
-constexpr int   DEFAULT_CONTEXT_SIZE    = 8192;
+constexpr int   DEFAULT_CONTEXT_SIZE    = 16384;
 constexpr int   OVERFLOW_HEADROOM       = 4;
 constexpr int   BATCH_SIZE              = 512;
 constexpr float DEFAULT_SAMPLER_TEMP    = 0.3f;
@@ -101,6 +101,7 @@ static llama_context *init_context(llama_model *model, const int n_ctx = DEFAULT
     ctx_params.n_ubatch = BATCH_SIZE;
     ctx_params.n_threads = n_threads;
     ctx_params.n_threads_batch = n_threads;
+    ctx_params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_ENABLED;
     auto *context = llama_init_from_model(g_model, ctx_params);
     if (context == nullptr) {
         LOGe("%s: llama_new_context_with_model() returned null)", __func__);
@@ -286,6 +287,7 @@ constexpr const char *ROLE_ASSISTANT    = "assistant";
 static std::vector<common_chat_msg> chat_msgs;
 static llama_pos system_prompt_position;
 static llama_pos current_position;
+static llama_pos stop_generation_position;
 
 static void reset_long_term_states(const bool clear_kv_cache = true) {
     chat_msgs.clear();
@@ -310,6 +312,7 @@ static void shift_context() {
     llama_memory_seq_rm(llama_get_memory(g_context), 0, system_prompt_position, system_prompt_position + n_discard);
     llama_memory_seq_add(llama_get_memory(g_context), 0, system_prompt_position + n_discard, current_position, -n_discard);
     current_position -= n_discard;
+    stop_generation_position -= n_discard;
     LOGi("%s: Context shifting done! Current position: %d", __func__, current_position);
 }
 
@@ -326,11 +329,9 @@ static std::string chat_add_and_format(const std::string &role, const std::strin
 
 /**
  * Completion loop's short-term states:
- * - stop generation position
  * - token chars caching
  * - current assistant message being generated
  */
-static llama_pos stop_generation_position;
 static std::string cached_token_chars;
 static std::ostringstream assistant_ss;
 
@@ -472,7 +473,7 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_processUserPrompt(
 
     // Update position
     current_position += user_prompt_size;
-    stop_generation_position = current_position + user_prompt_size + n_predict;
+    stop_generation_position = current_position + n_predict;
     return 0;
 }
 
@@ -583,6 +584,38 @@ Java_com_arm_aichat_internal_InferenceEngineImpl_unload(JNIEnv * /*unused*/, job
     llama_batch_free(g_batch);
     llama_free(g_context);
     llama_model_free(g_model);
+}
+
+extern "C"
+JNIEXPORT jint JNICALL
+Java_com_arm_aichat_internal_InferenceEngineImpl_nativeResetContext(
+        JNIEnv *env,
+        jobject /*unused*/
+) {
+    if (g_context == nullptr) {
+        return 1;
+    }
+
+    LOGi("Resetting context to system prompt position: %d", system_prompt_position);
+
+    // 1. Rollback KV cache to end of system prompt
+    if (current_position > system_prompt_position) {
+        llama_memory_seq_rm(llama_get_memory(g_context), 0, system_prompt_position, -1);
+        current_position = system_prompt_position;
+    }
+
+    // 2. Reset short-term states
+    reset_short_term_states();
+
+    // 3. Clear logical chat history after system message
+    const bool has_system_msg = !chat_msgs.empty() && chat_msgs[0].role == ROLE_SYSTEM;
+    const size_t target_size = has_system_msg ? 1 : 0;
+
+    while (chat_msgs.size() > target_size) {
+        chat_msgs.pop_back();
+    }
+
+    return 0;
 }
 
 extern "C"

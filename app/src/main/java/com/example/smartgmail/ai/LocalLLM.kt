@@ -14,8 +14,21 @@ class LocalLLM(context: Context) {
         engine.loadModel(modelPath)
     }
 
+    private var lastSystemPrompt: String? = null
+
     suspend fun setSystemPrompt(prompt: String) {
+        if (lastSystemPrompt == prompt) {
+            // Already set in native engine, just reset context to it
+            resetContext()
+            return
+        }
+        
         engine.setSystemPrompt(prompt)
+        lastSystemPrompt = prompt
+    }
+
+    suspend fun resetContext() {
+        engine.resetContext()
     }
 
     fun generate(

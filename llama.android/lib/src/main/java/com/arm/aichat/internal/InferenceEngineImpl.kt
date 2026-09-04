@@ -101,6 +101,9 @@ internal class InferenceEngineImpl private constructor(
     private external fun processUserPrompt(userPrompt: String, predictLength: Int): Int
 
     @FastNative
+    private external fun nativeResetContext(): Int
+
+    @FastNative
     private external fun generateNextToken(): String?
 
     @FastNative
@@ -210,6 +213,28 @@ internal class InferenceEngineImpl private constructor(
             Log.i(TAG, "System prompt processed! Awaiting user prompt...")
             _state.value = InferenceEngine.State.ModelReady
         }
+
+    /**
+     * Resets the context to the state after the system prompt
+     */
+    override suspend fun resetContext() {
+        withContext(llamaDispatcher) {
+            check(_state.value is InferenceEngine.State.ModelReady) {
+                "Cannot reset context in ${_state.value.javaClass.simpleName}!"
+            }
+
+            Log.i(TAG, "Resetting context...")
+            nativeResetContext().let { result ->
+                if (result != 0) {
+                    RuntimeException("Failed to reset context: $result").also {
+                        _state.value = InferenceEngine.State.Error(it)
+                        throw it
+                    }
+                }
+            }
+            Log.i(TAG, "Context reset complete.")
+        }
+    }
 
     /**
      * Send plain text user prompt to LLM, which starts generating tokens in a [Flow]

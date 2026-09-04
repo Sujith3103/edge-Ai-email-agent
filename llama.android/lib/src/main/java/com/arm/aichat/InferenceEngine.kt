@@ -26,6 +26,12 @@ interface InferenceEngine {
     suspend fun setSystemPrompt(systemPrompt: String)
 
     /**
+     * Resets the context to the state after the system prompt.
+     * This allows reusing the processed system prompt for multiple user prompts.
+     */
+    suspend fun resetContext()
+
+    /**
      * Sends a user prompt to the loaded model and returns a Flow of generated tokens.
      */
     fun sendUserPrompt(message: String, predictLength: Int = DEFAULT_PREDICT_LENGTH): Flow<String>

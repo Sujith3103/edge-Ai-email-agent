@@ -53,7 +53,416 @@ class EmailAnalyzer(
          * Build the LLM prompt.
          */
 
-        val prompt = """
+        val userPrompt = """
+EMAIL:
+
+$context
+""".trimIndent()
+
+        Log.d(
+            "workflow",
+            "3. PROMPT BUILT"
+        )
+
+        Log.d(
+            "workflow",
+            "Prompt length = ${userPrompt.length}"
+        )
+
+
+        /*
+         * Start inference.
+         */
+
+        var response = ""
+
+        val inferenceStartTime =
+            System.currentTimeMillis()
+
+        var firstTokenReceived = false
+
+        Log.d(
+            "workflow",
+            "4. CALLING QWEN"
+        )
+
+        val responseBuilder =
+            StringBuilder()
+
+        // -----------------------------------------------------
+        // OPTIMIZATION: System Prompt Caching
+        // -----------------------------------------------------
+        localLLM.setSystemPrompt(SYSTEM_PROMPT)
+
+        localLLM
+            .generate(
+                prompt = userPrompt,
+                maxTokens = 512
+            )
+            .collect { token ->
+
+                responseBuilder.append(token)
+
+                response = responseBuilder.toString()
+
+                if (!firstTokenReceived) {
+
+                    firstTokenReceived = true
+
+                    val firstTokenTime =
+                        System.currentTimeMillis() - inferenceStartTime
+
+                    Log.d(
+                        "workflow",
+                        "5. FIRST TOKEN RECEIVED after ${firstTokenTime} ms"
+                    )
+                }
+            }
+
+        val totalInferenceTime =
+            System.currentTimeMillis() - inferenceStartTime
+
+        Log.d(
+            "workflow",
+            "6. QWEN FINISHED"
+        )
+
+        Log.d(
+            "workflow",
+            "Inference time = ${totalInferenceTime} ms"
+        )
+
+        Log.d(
+            "workflow",
+            "Response length = ${response.length}"
+        )
+
+        Log.d(
+            "workflow",
+            "Raw response length = ${response.length}"
+        )
+
+        Log.d(
+            "workflow",
+            "RAW QWEN RESPONSE:"
+        )
+
+        Log.d(
+            "workflow",
+            response
+        )
+
+
+        /*
+         * Convert the JSON returned by Qwen
+         * into EmailAnalysis.
+         */
+
+        Log.d(
+            "workflow",
+            "7. PARSING RESPONSE"
+        )
+
+        val analysis =
+            parseResponse(
+                emailId = email.id,
+                response = response
+            )
+
+
+        Log.d(
+            "workflow",
+            "8. ANALYSIS COMPLETE"
+        )
+
+        Log.d(
+            "workflow",
+            "Priority = ${analysis.priority}"
+        )
+
+        Log.d(
+            "workflow",
+            "Summary = ${analysis.summary}"
+        )
+
+        Log.d(
+            "workflow",
+            "Action items = ${analysis.actionItems}"
+        )
+
+        Log.d(
+            "workflow",
+            "Deadlines = ${analysis.deadlines}"
+        )
+
+        Log.d(
+            "workflow",
+            "Calendar events = ${analysis.calendarEvents}"
+        )
+
+
+        return analysis
+    }
+
+
+    private fun parseResponse(
+        emailId: String,
+        response: String
+    ): EmailAnalysis {
+
+        val jsonText =
+            extractJson(response)
+
+        val json =
+            JSONObject(jsonText)
+
+
+        val priority =
+            when (
+                json.optString("priority")
+                    .uppercase()
+            ) {
+
+                "HIGH" ->
+                    Priority.HIGH
+
+                "MEDIUM" ->
+                    Priority.MEDIUM
+
+                else ->
+                    Priority.LOW
+            }
+
+
+        val summary =
+            json.optString(
+                "summary",
+                ""
+            )
+
+
+        val actionItems =
+            parseStringArray(
+                json.optJSONArray(
+                    "actionItems"
+                )
+            )
+
+
+        val deadlines =
+            parseDeadlines(
+                json.optJSONArray(
+                    "deadlines"
+                )
+            )
+
+
+        val calendarEvents =
+            parseCalendarEvents(
+                json.optJSONArray(
+                    "calendarEvents"
+                )
+            )
+
+
+        return EmailAnalysis(
+
+            emailId = emailId,
+
+            priority = priority,
+
+            summary = summary,
+
+            actionItems = actionItems,
+
+            deadlines = deadlines,
+
+            calendarEvents = calendarEvents
+        )
+    }
+
+
+    private fun extractJson(
+        response: String
+    ): String {
+
+        val start =
+            response.indexOf("{")
+
+        val end =
+            response.lastIndexOf("}")
+
+
+        if (
+            start == -1 ||
+            end == -1 ||
+            end <= start
+        ) {
+
+            throw IllegalStateException(
+                "LLM did not return valid JSON:\n$response"
+            )
+        }
+
+
+        return response.substring(
+            start,
+            end + 1
+        )
+    }
+
+
+    private fun parseStringArray(
+        array: JSONArray?
+    ): List<String> {
+
+        if (array == null) {
+            return emptyList()
+        }
+
+
+        val result =
+            mutableListOf<String>()
+
+
+        for (i in 0 until array.length()) {
+
+            val value =
+                array.optString(i)
+
+
+            if (value.isNotBlank()) {
+
+                result.add(value)
+            }
+        }
+
+
+        return result
+    }
+
+
+    private fun parseDeadlines(
+        array: JSONArray?
+    ): List<Deadline> {
+
+        if (array == null) {
+
+            return emptyList()
+        }
+
+
+        val result =
+            mutableListOf<Deadline>()
+
+
+        for (i in 0 until array.length()) {
+
+            val item =
+                array.optJSONObject(i)
+                    ?: continue
+
+
+            result.add(
+
+                Deadline(
+
+                    description =
+                        item.optString(
+                            "description",
+                            ""
+                        ),
+
+                    date =
+                        item.optString(
+                            "date",
+                            null
+                        ),
+
+                    time =
+                        item.optString(
+                            "time",
+                            null
+                        )
+                )
+            )
+        }
+
+
+        return result
+    }
+
+
+    private fun parseCalendarEvents(
+        array: JSONArray?
+    ): List<CalendarEvent> {
+
+        if (array == null) {
+
+            return emptyList()
+        }
+
+
+        val result =
+            mutableListOf<CalendarEvent>()
+
+
+        for (i in 0 until array.length()) {
+
+            val item =
+                array.optJSONObject(i)
+                    ?: continue
+
+
+            result.add(
+
+                CalendarEvent(
+
+                    title =
+                        item.optString(
+                            "title",
+                            ""
+                        ),
+
+                    date =
+                        item.optString(
+                            "date",
+                            null
+                        ),
+
+                    startTime =
+                        item.optString(
+                            "startTime",
+                            null
+                        ),
+
+                    endTime =
+                        item.optString(
+                            "endTime",
+                            null
+                        ),
+
+                    location =
+                        item.optString(
+                            "location",
+                            null
+                        ),
+
+                    description =
+                        item.optString(
+                            "description",
+                            null
+                        )
+                )
+            )
+        }
+
+
+        return result
+    }
+
+    companion object {
+        private const val SYSTEM_PROMPT = """
 You are SmartGmail's email analysis engine.
 
 Analyze the email and return ONLY valid JSON.
@@ -476,426 +885,6 @@ FINAL CHECK FOR THIS DISTINCTION:
 
 "Project requirements have been updated."
 → MEDIUM
-
-
-EMAIL:
-
-$context
-""".trimIndent()//    Analyze this email.
-//
-//    Return ONLY JSON.
-//
-//    {
-//      "priority": "HIGH",
-//      "summary": "short summary",
-//      "actionItems": [],
-//      "deadlines": [],
-//      "calendarEvents": []
-//    }
-//
-//    Email:
-//    Please submit the project report by Friday at 5 PM.
-//""".trimIndent()
-
-        Log.d(
-            "workflow",
-            "3. PROMPT BUILT"
-        )
-
-        Log.d(
-            "workflow",
-            "Prompt length = ${prompt.length}"
-        )
-
-        Log.d(
-            "workflow",
-            "Prompt ending = ${prompt.takeLast(500)}"
-        )
-
-
-        /*
-         * Start inference.
-         */
-
-        var response = ""
-
-        val inferenceStartTime =
-            System.currentTimeMillis()
-
-        var firstTokenReceived = false
-
-        Log.d(
-            "workflow",
-            "4. CALLING QWEN"
-        )
-
-        val responseBuilder =
-            StringBuilder()
-
-        localLLM
-            .generate(
-                prompt = prompt,
-                maxTokens = 512
-            )
-            .collect { token ->
-
-                responseBuilder.append(token)
-
-                response = responseBuilder.toString()
-
-                if (!firstTokenReceived) {
-
-                    firstTokenReceived = true
-
-                    val firstTokenTime =
-                        System.currentTimeMillis() - inferenceStartTime
-
-                    Log.d(
-                        "workflow",
-                        "5. FIRST TOKEN RECEIVED after ${firstTokenTime} ms"
-                    )
-                }
-            }
-
-        val totalInferenceTime =
-            System.currentTimeMillis() - inferenceStartTime
-
-        Log.d(
-            "workflow",
-            "6. QWEN FINISHED"
-        )
-
-        Log.d(
-            "workflow",
-            "Inference time = ${totalInferenceTime} ms"
-        )
-
-        Log.d(
-            "workflow",
-            "Response length = ${response.length}"
-        )
-
-        Log.d(
-            "workflow",
-            "Raw response length = ${response.length}"
-        )
-
-        Log.d(
-            "workflow",
-            "RAW QWEN RESPONSE:"
-        )
-
-        Log.d(
-            "workflow",
-            response
-        )
-
-
-        /*
-         * Convert the JSON returned by Qwen
-         * into EmailAnalysis.
-         */
-
-        Log.d(
-            "workflow",
-            "7. PARSING RESPONSE"
-        )
-
-        val analysis =
-            parseResponse(
-                emailId = email.id,
-                response = response
-            )
-
-
-        Log.d(
-            "workflow",
-            "8. ANALYSIS COMPLETE"
-        )
-
-        Log.d(
-            "workflow",
-            "Priority = ${analysis.priority}"
-        )
-
-        Log.d(
-            "workflow",
-            "Summary = ${analysis.summary}"
-        )
-
-        Log.d(
-            "workflow",
-            "Action items = ${analysis.actionItems}"
-        )
-
-        Log.d(
-            "workflow",
-            "Deadlines = ${analysis.deadlines}"
-        )
-
-        Log.d(
-            "workflow",
-            "Calendar events = ${analysis.calendarEvents}"
-        )
-
-
-        return analysis
-    }
-
-
-    private fun parseResponse(
-        emailId: String,
-        response: String
-    ): EmailAnalysis {
-
-        val jsonText =
-            extractJson(response)
-
-        val json =
-            JSONObject(jsonText)
-
-
-        val priority =
-            when (
-                json.optString("priority")
-                    .uppercase()
-            ) {
-
-                "HIGH" ->
-                    Priority.HIGH
-
-                "MEDIUM" ->
-                    Priority.MEDIUM
-
-                else ->
-                    Priority.LOW
-            }
-
-
-        val summary =
-            json.optString(
-                "summary",
-                ""
-            )
-
-
-        val actionItems =
-            parseStringArray(
-                json.optJSONArray(
-                    "actionItems"
-                )
-            )
-
-
-        val deadlines =
-            parseDeadlines(
-                json.optJSONArray(
-                    "deadlines"
-                )
-            )
-
-
-        val calendarEvents =
-            parseCalendarEvents(
-                json.optJSONArray(
-                    "calendarEvents"
-                )
-            )
-
-
-        return EmailAnalysis(
-
-            emailId = emailId,
-
-            priority = priority,
-
-            summary = summary,
-
-            actionItems = actionItems,
-
-            deadlines = deadlines,
-
-            calendarEvents = calendarEvents
-        )
-    }
-
-
-    private fun extractJson(
-        response: String
-    ): String {
-
-        val start =
-            response.indexOf("{")
-
-        val end =
-            response.lastIndexOf("}")
-
-
-        if (
-            start == -1 ||
-            end == -1 ||
-            end <= start
-        ) {
-
-            throw IllegalStateException(
-                "LLM did not return valid JSON:\n$response"
-            )
-        }
-
-
-        return response.substring(
-            start,
-            end + 1
-        )
-    }
-
-
-    private fun parseStringArray(
-        array: JSONArray?
-    ): List<String> {
-
-        if (array == null) {
-            return emptyList()
-        }
-
-
-        val result =
-            mutableListOf<String>()
-
-
-        for (i in 0 until array.length()) {
-
-            val value =
-                array.optString(i)
-
-
-            if (value.isNotBlank()) {
-
-                result.add(value)
-            }
-        }
-
-
-        return result
-    }
-
-
-    private fun parseDeadlines(
-        array: JSONArray?
-    ): List<Deadline> {
-
-        if (array == null) {
-
-            return emptyList()
-        }
-
-
-        val result =
-            mutableListOf<Deadline>()
-
-
-        for (i in 0 until array.length()) {
-
-            val item =
-                array.optJSONObject(i)
-                    ?: continue
-
-
-            result.add(
-
-                Deadline(
-
-                    description =
-                        item.optString(
-                            "description",
-                            ""
-                        ),
-
-                    date =
-                        item.optString(
-                            "date",
-                            null
-                        ),
-
-                    time =
-                        item.optString(
-                            "time",
-                            null
-                        )
-                )
-            )
-        }
-
-
-        return result
-    }
-
-
-    private fun parseCalendarEvents(
-        array: JSONArray?
-    ): List<CalendarEvent> {
-
-        if (array == null) {
-
-            return emptyList()
-        }
-
-
-        val result =
-            mutableListOf<CalendarEvent>()
-
-
-        for (i in 0 until array.length()) {
-
-            val item =
-                array.optJSONObject(i)
-                    ?: continue
-
-
-            result.add(
-
-                CalendarEvent(
-
-                    title =
-                        item.optString(
-                            "title",
-                            ""
-                        ),
-
-                    date =
-                        item.optString(
-                            "date",
-                            null
-                        ),
-
-                    startTime =
-                        item.optString(
-                            "startTime",
-                            null
-                        ),
-
-                    endTime =
-                        item.optString(
-                            "endTime",
-                            null
-                        ),
-
-                    location =
-                        item.optString(
-                            "location",
-                            null
-                        ),
-
-                    description =
-                        item.optString(
-                            "description",
-                            null
-                        )
-                )
-            )
-        }
-
-
-        return result
+"""
     }
 }

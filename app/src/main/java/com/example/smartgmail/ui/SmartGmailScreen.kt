@@ -57,15 +57,7 @@ fun SmartGmailScreen(
 
         modifier = modifier.fillMaxSize(),
         topBar = {
-            SmartGmailHeader(
-                onMenuClick = {
-                    // menu
-                },
-//                onRefreshClick = {
-//                    // refresh
-//                    GmailSyncWorker(context())
-//                }
-            )
+            SmartGmailHeader()
         },
         // =====================================================
         // CUSTOM HEADER
@@ -224,7 +216,7 @@ fun SmartGmailScreen(
 
                 // =================================================
                 // TASKS
-                // =================================================
+                // ================================================
 
                 SmartGmailPage.TASKS -> {
 
