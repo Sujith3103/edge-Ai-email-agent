@@ -1,6 +1,7 @@
 package com.example.smartgmail.gmail
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
@@ -85,5 +86,21 @@ class GmailAuth {
         result: AuthorizationResult
     ): String? {
         return result.accessToken
+    }
+
+    suspend fun authorizeSilently(context: Context): String? {
+        val client = Identity.getAuthorizationClient(context)
+        return try {
+            val result = com.google.android.gms.tasks.Tasks.await(
+                client.authorize(createAuthorizationRequest())
+            )
+            if (!result.hasResolution()) {
+                result.accessToken
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
     }
 }

@@ -14,19 +14,10 @@ class EmailRepository(
         email: Email
     ): Boolean {
 
-        // Check whether Gmail message ID
-        // already exists in our database.
         if (emailDao.emailExists(email.id)) {
-
-            println(
-                "EMAIL ALREADY EXISTS: ${email.id}"
-            )
-
             return false
         }
 
-        // Convert application model
-        // into database entity.
         val entity = EmailEntity(
             id = email.id,
             threadId = email.threadId,
@@ -37,34 +28,23 @@ class EmailRepository(
             body = email.body
         )
 
-        // Store the new email.
         emailDao.insertEmail(entity)
-
-        println(
-            "NEW EMAIL SAVED: ${email.id}"
-        )
-
         return true
     }
 
+    fun getAllEmails(): Flow<List<EmailEntity>> = emailDao.getAllEmails()
 
-    fun getAllEmails():
-            Flow<List<EmailEntity>> {
+    fun getInboxEmails(): Flow<List<InboxEmail>> = emailDao.getInboxEmails()
 
-        return emailDao.getAllEmails()
-    }
+    fun getFailedEmails(): Flow<List<InboxEmail>> = emailDao.getFailedEmails()
 
+    fun getDeletedEmails(): Flow<List<InboxEmail>> = emailDao.getDeletedEmails()
 
-    fun getInboxEmails(): Flow<List<InboxEmail>> {
+    suspend fun getEmail(emailId: String): EmailEntity? = emailDao.getEmail(emailId)
 
-        return emailDao.getInboxEmails()
-    }
+    suspend fun markAsDeleted(emailId: String) = emailDao.markAsDeleted(emailId)
 
+    suspend fun restoreEmail(emailId: String) = emailDao.restoreEmail(emailId)
 
-    suspend fun getEmail(
-        emailId: String
-    ): EmailEntity? {
-
-        return emailDao.getEmail(emailId)
-    }
+    suspend fun deletePermanently(emailId: String) = emailDao.deletePermanently(emailId)
 }

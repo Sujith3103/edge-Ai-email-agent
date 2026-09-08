@@ -31,6 +31,7 @@ interface InferenceEngine {
      */
     suspend fun resetContext()
 
+
     /**
      * Sends a user prompt to the loaded model and returns a Flow of generated tokens.
      */

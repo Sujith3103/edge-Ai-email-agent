@@ -35,6 +35,17 @@ class GmailManager(
             }
     }
 
+    fun clearAccessToken() {
+        context
+            .getSharedPreferences(
+                PREFS_NAME,
+                Context.MODE_PRIVATE
+            )
+            .edit {
+                remove(ACCESS_TOKEN)
+            }
+    }
+
     fun getAuth(): GmailAuth {
         return gmailAuth
     }

@@ -10,6 +10,7 @@ import com.example.smartgmail.gmail.GmailManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 
 class SmartGmailApplication : Application() {
 
@@ -24,6 +25,8 @@ class SmartGmailApplication : Application() {
     val database by lazy {
         DatabaseProvider.getDatabase(this)
     }
+
+    val syncMutex = Mutex()
 
     override fun onCreate() {
         super.onCreate()

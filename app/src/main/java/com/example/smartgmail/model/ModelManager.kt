@@ -16,6 +16,9 @@ class ModelManager(private val context: Context) {
 
     }
 
+    val modelId: String
+        get() = MODEL_NAME
+
     private val modelsDirectory: File
         get() = File(context.filesDir, "models")
 

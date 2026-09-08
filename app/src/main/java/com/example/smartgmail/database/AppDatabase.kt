@@ -21,7 +21,7 @@ import com.example.smartgmail.database.entity.EventEntity
         TaskEntity::class,
         EventEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {

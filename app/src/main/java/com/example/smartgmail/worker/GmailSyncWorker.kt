@@ -1,26 +1,20 @@
 package com.example.smartgmail.worker
 
 import android.content.Context
-import android.util.Base64
 import android.util.Log
-import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.edit
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.smartgmail.SmartGmailApplication
 import com.example.smartgmail.ai.EmailAnalyzer
-import com.example.smartgmail.database.DatabaseProvider
-import com.example.smartgmail.database.entity.EmailEntity
 import com.example.smartgmail.gmail.GmailApi
 import com.example.smartgmail.gmail.GmailApiException
-import com.example.smartgmail.context.EmailContextBuilder
 import com.example.smartgmail.gmail.GmailMessageParser
-import com.example.smartgmail.model.Email
 import com.example.smartgmail.repository.EmailRepository
 import com.example.smartgmail.repository.EmailAnalysisRepository
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
+
 class GmailSyncWorker(
     appContext: Context,
     workerParams: WorkerParameters
@@ -32,55 +26,39 @@ class GmailSyncWorker(
     private val gmailApi = GmailApi()
 
     override suspend fun doWork(): Result {
+        val app = applicationContext as SmartGmailApplication
+        return app.syncMutex.withLock {
+            syncInternal(app)
+        }
+    }
 
+    private suspend fun syncInternal(app: SmartGmailApplication): Result {
         println("========== GMAIL SYNC STARTED ==========")
 
+        val gmailManager = app.gmailManager
+
         try {
-
-            // =================================================
-            // APPLICATION
-            // =================================================
-
-
-
-            val app =
-                applicationContext as SmartGmailApplication
-
-            val gmailManager =
-                app.gmailManager
-
             val aiManager = app.aiManager
-
-            val localLLM = aiManager.getLLM()
-
-            val database =
-                app.database
-
-            val emailRepository =
-                EmailRepository(
-                    database.emailDao()
-                )
-
-            val emailAnalysisRepository =
-                EmailAnalysisRepository(
-                    database
-                )
-
-            val emailAnalyzer = EmailAnalyzer(localLLM)
+            val database = app.database
+            val emailRepository = EmailRepository(database.emailDao())
+            val emailAnalysisRepository = EmailAnalysisRepository(database)
 
             // =================================================
             // AUTHENTICATION
             // =================================================
 
-            val accessToken =
-                gmailManager.getAccessToken()
+            var accessToken = gmailManager.getAccessToken()
 
             if (accessToken == null) {
+                println("No Gmail access token available, trying silent auth...")
+                accessToken = gmailManager.getAuth().authorizeSilently(applicationContext)
+                if (accessToken != null) {
+                    gmailManager.saveAccessToken(accessToken)
+                }
+            }
 
-                println(
-                    "No Gmail access token available"
-                )
-
+            if (accessToken == null) {
+                println("No Gmail access token available after silent auth")
                 return Result.failure()
             }
 
@@ -164,11 +142,15 @@ class GmailSyncWorker(
                     // GET FULL MESSAGE
                     // -----------------------------------------
 
-                    val rawMessage =
+                    val rawMessage = try {
                         gmailApi.getMessage(
                             accessToken = accessToken,
                             messageId = messageReference.id
                         )
+                    } catch (e: Exception) {
+                        Log.e("sync", "Failed to fetch full message ${messageReference.id}", e)
+                        continue
+                    }
 
 
                     // -----------------------------------------
@@ -235,8 +217,12 @@ class GmailSyncWorker(
                     // -----------------------------------------
 
                     try {
-                        val analyzedEmail =
-                            emailAnalyzer.analyze(email)
+                        emailAnalysisRepository.saveAnalyzingStatus(email.id)
+
+                        val analyzedEmail = app.aiManager.runAnalysis { llm ->
+                            val analyzer = EmailAnalyzer(llm)
+                            analyzer.analyze(email)
+                        }
 
                         emailAnalysisRepository.saveAnalysis(
                             analyzedEmail
@@ -309,10 +295,12 @@ class GmailSyncWorker(
             if (e.code == 401) {
 
                 println(
-                    "Gmail access token is invalid or expired."
+                    "Gmail access token is invalid or expired. Clearing and retrying..."
                 )
+                
+                gmailManager.clearAccessToken()
 
-                return Result.failure()
+                return Result.retry()
             }
 
             return Result.retry()

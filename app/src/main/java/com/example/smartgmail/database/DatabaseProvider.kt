@@ -21,6 +21,7 @@ object DatabaseProvider {
                         AppDatabase::class.java,
                         "smartgmail.db"
                     )
+                        .fallbackToDestructiveMigration()
                         .build()
                         .also {
                             INSTANCE = it

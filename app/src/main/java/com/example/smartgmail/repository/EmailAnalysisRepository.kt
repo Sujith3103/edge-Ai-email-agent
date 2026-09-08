@@ -17,6 +17,13 @@ class EmailAnalysisRepository(
     private val taskDao = database.taskDao()
     private val eventDao = database.eventDao()
 
+    suspend fun getAnalysis(emailId: String) = emailAnalysisDao.getAnalysis(emailId)
+
+    suspend fun saveAnalyzingStatus(emailId: String) {
+        emailAnalysisDao.insertAnalyzingStatus(emailId)
+        emailAnalysisDao.updateStatus(emailId, "ANALYZING")
+    }
+
     suspend fun saveAnalysis(analysis: EmailAnalysis) {
         database.withTransaction {
             // 1. Handle Idempotency: Delete existing generated items for this email

@@ -15,17 +15,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.example.smartgmail.ui.components.GmailMenu
 import com.example.smartgmail.worker.GmailSyncScheduler
 
 @Composable
-fun SmartGmailHeader() {
-
+fun SmartGmailHeader(
+    onMenuClick: () -> Unit
+) {
     val context = LocalContext.current
-
-    var menuExpanded by remember {
-        mutableStateOf(false)
-    }
 
     Row(
         modifier = Modifier
@@ -33,43 +29,19 @@ fun SmartGmailHeader() {
             .height(56.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-
-        // MENU
-        IconButton(
-            onClick = {
-                menuExpanded = true
-            }
-        ) {
+        IconButton(onClick = onMenuClick) {
             Icon(
                 imageVector = Icons.Default.Menu,
                 contentDescription = "Menu"
             )
         }
 
-        GmailMenu(
-            expanded = menuExpanded,
-            onDismiss = {
-                menuExpanded = false
-            },
-            onSyncClick = {
-                GmailSyncScheduler.refreshNow(context)
-            },
-            onSettingsClick = {
-                // TODO: navigate to settings
-            },
-            onAboutClick = {
-                // TODO: show about screen/dialog
-            }
-        )
-
-        // TITLE
         Text(
             text = "Brill Mail",
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.titleLarge
         )
 
-        // REFRESH
         IconButton(
             onClick = {
                 GmailSyncScheduler.refreshNow(context)

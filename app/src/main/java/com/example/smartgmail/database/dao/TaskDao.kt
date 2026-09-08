@@ -37,4 +37,7 @@ interface TaskDao {
 
     @Query("DELETE FROM tasks WHERE emailId = :emailId")
     suspend fun deleteTasksByEmailId(emailId: String)
+
+    @Query("DELETE FROM tasks WHERE id = :taskId")
+    suspend fun deleteTask(taskId: Long)
 }

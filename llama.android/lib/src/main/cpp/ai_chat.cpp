@@ -287,7 +287,6 @@ constexpr const char *ROLE_ASSISTANT    = "assistant";
 static std::vector<common_chat_msg> chat_msgs;
 static llama_pos system_prompt_position;
 static llama_pos current_position;
-static llama_pos stop_generation_position;
 
 static void reset_long_term_states(const bool clear_kv_cache = true) {
     chat_msgs.clear();
@@ -312,7 +311,6 @@ static void shift_context() {
     llama_memory_seq_rm(llama_get_memory(g_context), 0, system_prompt_position, system_prompt_position + n_discard);
     llama_memory_seq_add(llama_get_memory(g_context), 0, system_prompt_position + n_discard, current_position, -n_discard);
     current_position -= n_discard;
-    stop_generation_position -= n_discard;
     LOGi("%s: Context shifting done! Current position: %d", __func__, current_position);
 }
 
@@ -329,9 +327,11 @@ static std::string chat_add_and_format(const std::string &role, const std::strin
 
 /**
  * Completion loop's short-term states:
+ * - stop generation position
  * - token chars caching
  * - current assistant message being generated
  */
+static llama_pos stop_generation_position;
 static std::string cached_token_chars;
 static std::ostringstream assistant_ss;
 

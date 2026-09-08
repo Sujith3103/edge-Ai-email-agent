@@ -19,5 +19,7 @@ data class EmailEntity(
 
     val date: String,
 
-    val body: String
+    val body: String,
+
+    val isDeleted: Boolean = false
 )

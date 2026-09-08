@@ -1,286 +1,264 @@
 package com.example.smartgmail.ui.tasks
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Card
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-
-
-data class Task(
-    val id: String,
-    val title: String,
-    val date: String?,
-    val time: String?,
-    val sender: String,
-    val completed: Boolean
-)
-
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.smartgmail.SmartGmailApplication
+import com.example.smartgmail.database.entity.EventEntity
+import com.example.smartgmail.database.entity.TaskEntity
+import com.example.smartgmail.repository.EventRepository
+import com.example.smartgmail.repository.TaskRepository
 
 @Composable
 fun TasksScreen(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showCompletedOnly: Boolean = false,
+    onRefreshSent: (() -> Unit)? = null
 ) {
+    val context = LocalContext.current
+    val app = context.applicationContext as SmartGmailApplication
+    val taskRepository = remember { TaskRepository(app.database.taskDao()) }
+    val eventRepository = remember { EventRepository(app.database.eventDao()) }
+    
+    val tasksViewModel: TasksViewModel = viewModel(
+        factory = TasksViewModel.Factory(taskRepository)
+    )
+    val eventsViewModel: EventsViewModel = viewModel(
+        factory = EventsViewModel.Factory(eventRepository)
+    )
 
-    var tasks by remember {
+    val incompleteTasks by tasksViewModel.incompleteTasks.collectAsState()
+    val completedTasks by tasksViewModel.completedTasks.collectAsState()
+    val events by eventsViewModel.allEvents.collectAsState()
 
-        mutableStateOf(
-
-            listOf(
-
-                Task(
-                    id = "1",
-                    title = "Submit project report",
-                    date = "Sep 4",
-                    time = "5:00 PM",
-                    sender = "Dr. Rao",
-                    completed = false
-                ),
-
-                Task(
-                    id = "2",
-                    title = "Prepare project presentation",
-                    date = "Sep 5",
-                    time = null,
-                    sender = "Dr. Rao",
-                    completed = false
-                ),
-
-                Task(
-                    id = "3",
-                    title = "Submit registration form",
-                    date = null,
-                    time = null,
-                    sender = "College",
-                    completed = true
+    Scaffold(
+        floatingActionButton = {
+            if (showCompletedOnly && onRefreshSent != null) {
+                ExtendedFloatingActionButton(
+                    onClick = onRefreshSent,
+                    icon = { Icon(Icons.Default.Refresh, null) },
+                    text = { Text("Refresh Sent Mails") }
                 )
-            )
-        )
-    }
-
-
-    val incomplete =
-        tasks.filter {
-            !it.completed
-        }
-
-    val completed =
-        tasks.filter {
-            it.completed
-        }
-
-
-    LazyColumn(
-
-        modifier =
-            modifier
-                .fillMaxSize()
-                .padding(16.dp),
-
-        verticalArrangement =
-            Arrangement.spacedBy(8.dp)
-    ) {
-
-        // =================================================
-        // HEADER
-        // =================================================
-
-        item {
-
-            Text(
-                text = "Tasks",
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(
-                modifier =
-                    Modifier.height(16.dp)
-            )
-        }
-
-
-        // =================================================
-        // ACTIVE TASKS
-        // =================================================
-
-        item {
-
-            Text(
-                text = "Upcoming",
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-
-        items(
-            items = incomplete,
-            key = {
-                it.id
             }
-        ) { task ->
-
-            TaskCard(
-                task = task,
-
-                onCheckedChange = {
-
-                    tasks =
-                        tasks.map {
-
-                            if (it.id == task.id) {
-
-                                it.copy(
-                                    completed = true
-                                )
-
-                            } else {
-                                it
-                            }
-                        }
-                }
-            )
         }
-
-
-        // =================================================
-        // COMPLETED
-        // =================================================
-
-        if (completed.isNotEmpty()) {
-
+    ) { padding ->
+        LazyColumn(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             item {
-
-                Spacer(
-                    modifier =
-                        Modifier.height(16.dp)
-                )
-
                 Text(
-                    text = "Completed",
+                    text = if (showCompletedOnly) "Completed Tasks" else "Tasks & Events",
+                    style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold
                 )
+                Spacer(modifier = Modifier.height(16.dp))
             }
 
-
-            items(
-                items = completed,
-                key = {
-                    it.id
-                }
-            ) { task ->
-
-                TaskCard(
-                    task = task,
-
-                    onCheckedChange = {
-
-                        tasks =
-                            tasks.map {
-
-                                if (it.id == task.id) {
-
-                                    it.copy(
-                                        completed = false
-                                    )
-
-                                } else {
-                                    it
-                                }
-                            }
+            if (!showCompletedOnly) {
+                // EVENTS SECTION
+                if (events.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Events",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
-                )
+
+                    items(events, key = { "event_${it.id}" }) { event ->
+                        EventCard(
+                            event = event,
+                            onDelete = { eventsViewModel.deleteEvent(event.id) }
+                        )
+                    }
+                }
+
+                // TASKS SECTION
+                if (incompleteTasks.isNotEmpty()) {
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Upcoming Tasks",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    items(incompleteTasks, key = { "task_${it.id}" }) { task ->
+                        TaskCard(
+                            task = task,
+                            onCheckedChange = { tasksViewModel.updateTaskCompletion(task, it) },
+                            onDelete = { tasksViewModel.deleteTask(task.id) }
+                        )
+                    }
+                }
+
+                if (events.isEmpty() && incompleteTasks.isEmpty()) {
+                    item {
+                        Box(
+                            modifier = Modifier.fillParentMaxHeight(0.7f).fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "Nothing scheduled yet",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            } else {
+                // COMPLETED TASKS ONLY
+                if (completedTasks.isNotEmpty()) {
+                    items(completedTasks, key = { "task_${it.id}" }) { task ->
+                        TaskCard(
+                            task = task,
+                            onCheckedChange = { tasksViewModel.updateTaskCompletion(task, it) },
+                            onDelete = { tasksViewModel.deleteTask(task.id) }
+                        )
+                    }
+                } else {
+                    item {
+                        Box(
+                            modifier = Modifier.fillParentMaxHeight(0.7f).fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "No completed tasks",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
             }
         }
     }
 }
 
+@Composable
+private fun EventCard(
+    event: EventEntity,
+    onDelete: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.CalendarToday,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = event.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error)
+                }
+            }
+
+            if (event.date != null) {
+                Text(
+                    text = "${event.date} ${event.startTime ?: ""} ${if (event.endTime != null) "- ${event.endTime}" else ""}",
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(start = 24.dp)
+                )
+            }
+
+            if (event.location != null) {
+                Row(
+                    modifier = Modifier.padding(start = 24.dp, top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(event.location, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+    }
+}
 
 @Composable
 private fun TaskCard(
-    task: Task,
-    onCheckedChange: () -> Unit
+    task: TaskEntity,
+    onCheckedChange: (Boolean) -> Unit,
+    onDelete: () -> Unit
 ) {
-
     Card(
-        modifier =
-            Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = if (task.completed) 
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            else 
+                MaterialTheme.colorScheme.surfaceVariant
+        )
     ) {
-
         Row(
-
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-
-            verticalAlignment =
-                Alignment.CenterVertically
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-
             Checkbox(
-
-                checked =
-                    task.completed,
-
-                onCheckedChange = {
-                    onCheckedChange()
-                }
+                checked = task.completed,
+                onCheckedChange = onCheckedChange
             )
 
-
-            Column(
-                modifier =
-                    Modifier.weight(1f)
-            ) {
-
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text =
-                        task.title,
-
-                    fontWeight =
-                        FontWeight.Medium
+                    text = task.description,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    textDecoration = if (task.completed) 
+                        androidx.compose.ui.text.style.TextDecoration.LineThrough 
+                    else null
                 )
 
-
-                Spacer(
-                    modifier =
-                        Modifier.height(4.dp)
-                )
-
-
-                if (
-                    task.date != null ||
-                    task.time != null
-                ) {
-
+                if (task.dueDate != null || task.dueTime != null) {
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text =
-                            listOfNotNull(
-                                task.date,
-                                task.time
-                            ).joinToString(
-                                " · "
-                            )
+                        text = listOfNotNull(task.dueDate, task.dueTime).joinToString(" · "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
+            }
 
-
-                Text(
-                    text =
-                        "From: ${task.sender}"
+            IconButton(onClick = onDelete) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete Task",
+                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
                 )
             }
         }
