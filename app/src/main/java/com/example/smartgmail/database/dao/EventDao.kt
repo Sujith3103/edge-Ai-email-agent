@@ -29,4 +29,16 @@ interface EventDao {
 
     @Query("DELETE FROM events WHERE id = :eventId")
     suspend fun deleteEvent(eventId: Long)
+
+    @Query("""
+        SELECT * FROM events 
+        WHERE title LIKE '%' || :query || '%' 
+        OR location LIKE '%' || :query || '%' 
+        OR description LIKE '%' || :query || '%'
+        LIMIT :limit
+    """)
+    suspend fun searchEvents(query: String, limit: Int = 5): List<EventEntity>
+
+    @Query("SELECT * FROM events ORDER BY date ASC, startTime ASC LIMIT :limit")
+    suspend fun getUpcomingEvents(limit: Int = 5): List<EventEntity>
 }

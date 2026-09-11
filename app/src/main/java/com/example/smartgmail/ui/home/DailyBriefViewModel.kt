@@ -22,14 +22,24 @@ class DailyBriefViewModel(
 
     data class BriefState(
         val greeting: String = "",
+        val todayDate: String = "",
         val inboxStats: InboxStats = InboxStats(),
+        val heroItem: HeroItem? = null,
+        val todaysEvents: List<EventEntity> = emptyList(),
+        val upcomingDeadlines: List<TaskEntity> = emptyList(),
         val categorizedItems: Map<String, List<BriefItem>> = emptyMap()
     )
 
     data class InboxStats(
-        val receivedCount: Int = 0,
-        val actionCount: Int = 0,
-        val eventCount: Int = 0
+        val taskCount: Int = 0,
+        val eventCount: Int = 0,
+        val highPriorityCount: Int = 0
+    )
+
+    data class HeroItem(
+        val title: String,
+        val detail: String,
+        val priority: String = "High Priority"
     )
 
     data class BriefItem(
@@ -49,7 +59,10 @@ class DailyBriefViewModel(
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = BriefState(greeting = getGreeting())
+        initialValue = BriefState(
+            greeting = getGreeting(),
+            todayDate = LocalDate.now().format(DateTimeFormatter.ofPattern("EEE, MMM d"))
+        )
     )
 
     private fun calculateBrief(
@@ -60,41 +73,63 @@ class DailyBriefViewModel(
         val today = LocalDate.now()
         val todayStr = today.format(DateTimeFormatter.ISO_LOCAL_DATE)
         val tomorrowStr = today.plusDays(1).format(DateTimeFormatter.ISO_LOCAL_DATE)
-
-        val categories = mutableMapOf<String, MutableList<BriefItem>>()
+        val nowTimeStr = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm"))
 
         // 1. STATS
         val stats = InboxStats(
-            receivedCount = emails.size,
-            actionCount = emails.count { it.priority == "HIGH" || it.priority == "MEDIUM" } + tasks.size,
-            eventCount = events.count { it.date == todayStr || it.date == tomorrowStr }
+            taskCount = tasks.size,
+            eventCount = events.count { 
+                (it.date ?: "") > todayStr || 
+                (it.date == todayStr && (it.startTime == null || it.startTime!! >= nowTimeStr))
+            },
+            highPriorityCount = emails.count { it.priority == "HIGH" } + tasks.count { it.dueDate == todayStr }
         )
 
-        // 2. CATEGORIZATION
-        
-        // IMPORTANT: High priority tasks or critical emails
-        val importantList = mutableListOf<BriefItem>()
-        tasks.forEach {
-            val dueText = when (it.dueDate) {
-                todayStr -> "today"
-                tomorrowStr -> "tomorrow"
-                else -> it.dueDate ?: ""
+        // 2. HERO ITEM
+        val urgentTask = tasks.find { it.dueDate == todayStr || it.dueDate == tomorrowStr }
+        val hero = urgentTask?.let {
+            HeroItem(
+                title = it.description,
+                detail = "Due ${if (it.dueDate == todayStr) "today" else "tomorrow"} at ${it.dueTime ?: ""}"
+            )
+        } ?: events.find { 
+            (it.date ?: "") > todayStr || 
+            (it.date == todayStr && (it.startTime == null || it.startTime!! >= nowTimeStr))
+        }?.let {
+            HeroItem(
+                title = it.title,
+                detail = "${if (it.date == todayStr) "Today" else it.date} at ${it.startTime ?: ""}"
+            )
+        }
+
+        // 3. SECTIONS
+        // Upcoming Events: Strictly next 5 relative to current time
+        val todaysEvents = events
+            .filter { it.date != null }
+            .filter { 
+                (it.date!! > todayStr) || 
+                (it.date == todayStr && (it.startTime == null || it.startTime!! >= nowTimeStr))
             }
-            importantList.add(BriefItem(it.description, "Due $dueText ${it.dueTime ?: ""}", BriefItem.ItemType.TASK))
-        }
-        emails.filter { it.priority == "HIGH" && !isShopping(it) }.take(2).forEach {
-            importantList.add(BriefItem(it.subject, it.summary ?: "", BriefItem.ItemType.EMAIL))
-        }
-        if (importantList.isNotEmpty()) categories["Important"] = importantList
+            .sortedWith(compareBy({ it.date }, { it.startTime ?: "00:00" }))
+            .take(5)
+        
+        // UPCOMING DEADLINES: Strictly next 2 relative to current time across all future dates
+        val upcomingDeadlines = tasks
+            .filter { it.dueDate != null }
+            .filter { 
+                (it.dueDate!! > todayStr) || 
+                (it.dueDate == todayStr && (it.dueTime == null || it.dueTime!! >= nowTimeStr))
+            }
+            .sortedWith(compareBy({ it.dueDate }, { it.dueTime ?: "23:59" }))
+            .take(2)
 
-        // MEETINGS: Today and tomorrow events
-        val meetingsList = events.filter { it.date == todayStr || it.date == tomorrowStr }.map {
-            val dateText = if (it.date == todayStr) "Today" else "Tomorrow"
-            BriefItem(it.title, "$dateText · ${it.startTime ?: ""}", BriefItem.ItemType.EVENT)
+        // 4. CATEGORIZATION
+        val categories = mutableMapOf<String, MutableList<BriefItem>>()
+        val importantEmails = emails.filter { it.priority == "HIGH" }.take(3).map {
+            BriefItem(it.subject, it.summary ?: "", BriefItem.ItemType.EMAIL)
         }
-        if (meetingsList.isNotEmpty()) categories["Meetings"] = meetingsList.toMutableList()
+        if (importantEmails.isNotEmpty()) categories["Important"] = importantEmails.toMutableList()
 
-        // SHOPPING: Filter by keywords
         val shoppingList = emails.filter { isShopping(it) }.map {
             BriefItem(it.subject, it.summary ?: "", BriefItem.ItemType.EMAIL)
         }
@@ -102,7 +137,11 @@ class DailyBriefViewModel(
 
         return BriefState(
             greeting = getGreeting(),
+            todayDate = today.format(DateTimeFormatter.ofPattern("EEE, MMM d")),
             inboxStats = stats,
+            heroItem = hero,
+            todaysEvents = todaysEvents,
+            upcomingDeadlines = upcomingDeadlines,
             categorizedItems = categories
         )
     }
@@ -116,9 +155,9 @@ class DailyBriefViewModel(
     private fun getGreeting(): String {
         val hour = LocalTime.now().hour
         return when (hour) {
-            in 0..11 -> "Good morning 👋"
-            in 12..16 -> "Good afternoon 👋"
-            else -> "Good evening 👋"
+            in 0..11 -> "Good morning"
+            in 12..16 -> "Good afternoon"
+            else -> "Good evening"
         }
     }
 

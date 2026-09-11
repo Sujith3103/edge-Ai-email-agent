@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -21,6 +22,7 @@ import com.example.smartgmail.database.entity.EventEntity
 import com.example.smartgmail.database.entity.TaskEntity
 import com.example.smartgmail.repository.EventRepository
 import com.example.smartgmail.repository.TaskRepository
+import com.example.smartgmail.ui.components.GlassCard
 
 @Composable
 fun TasksScreen(
@@ -44,29 +46,17 @@ fun TasksScreen(
     val completedTasks by tasksViewModel.completedTasks.collectAsState()
     val events by eventsViewModel.allEvents.collectAsState()
 
-    Scaffold(
-        floatingActionButton = {
-            if (showCompletedOnly && onRefreshSent != null) {
-                ExtendedFloatingActionButton(
-                    onClick = onRefreshSent,
-                    icon = { Icon(Icons.Default.Refresh, null) },
-                    text = { Text("Refresh Sent Mails") }
-                )
-            }
-        }
-    ) { padding ->
+    Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp),
+            modifier = Modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
                 Text(
                     text = if (showCompletedOnly) "Completed Tasks" else "Tasks & Events",
                     style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 )
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -79,12 +69,12 @@ fun TasksScreen(
                             text = "Events",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary
+                            color = Color(0xFF4285F4)
                         )
                     }
 
                     items(events, key = { "event_${it.id}" }) { event ->
-                        EventCard(
+                        EventCardGlass(
                             event = event,
                             onDelete = { eventsViewModel.deleteEvent(event.id) }
                         )
@@ -99,12 +89,12 @@ fun TasksScreen(
                             text = "Upcoming Tasks",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary
+                            color = Color(0xFF9334E6)
                         )
                     }
 
                     items(incompleteTasks, key = { "task_${it.id}" }) { task ->
-                        TaskCard(
+                        TaskCardGlass(
                             task = task,
                             onCheckedChange = { tasksViewModel.updateTaskCompletion(task, it) },
                             onDelete = { tasksViewModel.deleteTask(task.id) }
@@ -115,13 +105,13 @@ fun TasksScreen(
                 if (events.isEmpty() && incompleteTasks.isEmpty()) {
                     item {
                         Box(
-                            modifier = Modifier.fillParentMaxHeight(0.7f).fillMaxWidth(),
+                            modifier = Modifier.height(400.dp).fillMaxWidth(),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 "Nothing scheduled yet",
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = Color.White.copy(alpha = 0.4f)
                             )
                         }
                     }
@@ -130,7 +120,7 @@ fun TasksScreen(
                 // COMPLETED TASKS ONLY
                 if (completedTasks.isNotEmpty()) {
                     items(completedTasks, key = { "task_${it.id}" }) { task ->
-                        TaskCard(
+                        TaskCardGlass(
                             task = task,
                             onCheckedChange = { tasksViewModel.updateTaskCompletion(task, it) },
                             onDelete = { tasksViewModel.deleteTask(task.id) }
@@ -139,50 +129,57 @@ fun TasksScreen(
                 } else {
                     item {
                         Box(
-                            modifier = Modifier.fillParentMaxHeight(0.7f).fillMaxWidth(),
+                            modifier = Modifier.height(400.dp).fillMaxWidth(),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
                                 "No completed tasks",
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = Color.White.copy(alpha = 0.4f)
                             )
                         }
                     }
                 }
             }
         }
+        
+        if (showCompletedOnly && onRefreshSent != null) {
+            ExtendedFloatingActionButton(
+                onClick = onRefreshSent,
+                modifier = Modifier.align(Alignment.BottomEnd).padding(24.dp),
+                icon = { Icon(Icons.Default.Refresh, null) },
+                text = { Text("Refresh Sent Mails") },
+                containerColor = Color(0xFF4285F4),
+                contentColor = Color.White
+            )
+        }
     }
 }
 
 @Composable
-private fun EventCard(
+private fun EventCardGlass(
     event: EventEntity,
     onDelete: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)
-        )
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Default.CalendarToday,
                     contentDescription = null,
                     modifier = Modifier.size(16.dp),
-                    tint = MaterialTheme.colorScheme.primary
+                    tint = Color(0xFF4285F4)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = event.title,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 )
                 Spacer(modifier = Modifier.weight(1f))
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Default.Delete, "Delete", tint = Color.White.copy(alpha = 0.3f))
                 }
             }
 
@@ -190,6 +187,7 @@ private fun EventCard(
                 Text(
                     text = "${event.date} ${event.startTime ?: ""} ${if (event.endTime != null) "- ${event.endTime}" else ""}",
                     style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.6f),
                     modifier = Modifier.padding(start = 24.dp)
                 )
             }
@@ -199,9 +197,9 @@ private fun EventCard(
                     modifier = Modifier.padding(start = 24.dp, top = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(14.dp))
+                    Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(14.dp), tint = Color.White.copy(alpha = 0.6f))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(event.location, style = MaterialTheme.typography.bodySmall)
+                    Text(event.location, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.6f))
                 }
             }
         }
@@ -209,29 +207,23 @@ private fun EventCard(
 }
 
 @Composable
-private fun TaskCard(
+private fun TaskCardGlass(
     task: TaskEntity,
     onCheckedChange: (Boolean) -> Unit,
     onDelete: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = if (task.completed) 
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
-            else 
-                MaterialTheme.colorScheme.surfaceVariant
-        )
-    ) {
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Checkbox(
                 checked = task.completed,
-                onCheckedChange = onCheckedChange
+                onCheckedChange = onCheckedChange,
+                colors = CheckboxDefaults.colors(
+                    checkedColor = Color(0xFF9334E6),
+                    uncheckedColor = Color.White.copy(alpha = 0.4f)
+                )
             )
 
             Column(modifier = Modifier.weight(1f)) {
@@ -239,6 +231,7 @@ private fun TaskCard(
                     text = task.description,
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
+                    color = if (task.completed) Color.White.copy(alpha = 0.5f) else Color.White,
                     textDecoration = if (task.completed) 
                         androidx.compose.ui.text.style.TextDecoration.LineThrough 
                     else null
@@ -249,7 +242,7 @@ private fun TaskCard(
                     Text(
                         text = listOfNotNull(task.dueDate, task.dueTime).joinToString(" · "),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
+                        color = Color(0xFF9334E6)
                     )
                 }
             }
@@ -258,7 +251,7 @@ private fun TaskCard(
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Delete Task",
-                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
+                    tint = Color.White.copy(alpha = 0.3f)
                 )
             }
         }

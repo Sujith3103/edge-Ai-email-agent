@@ -7,6 +7,8 @@ import com.example.smartgmail.ai.AIManager
 import com.example.smartgmail.database.entity.InboxEmail
 import com.example.smartgmail.repository.EmailRepository
 import com.example.smartgmail.worker.GmailSyncScheduler
+import android.util.Log
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -61,16 +63,16 @@ class InboxViewModel(
 
     fun refreshFailed(context: android.content.Context) {
         viewModelScope.launch {
-            val failed = emailRepository.getFailedEmails().stateIn(this).value
-            if (failed.isEmpty()) return@launch
+            val failed = emailRepository.getFailedEmails().first()
+            if (failed.isEmpty()) {
+                android.widget.Toast.makeText(context, "No failed emails to process", android.widget.Toast.LENGTH_SHORT).show()
+                return@launch
+            }
             
-            // To properly re-process, we'd need to create the Analyzer.
-            // Since AiManager has the LLM, we can use it.
-            val localLLM = aiManager.getLLM()
-            val analyzer = com.example.smartgmail.ai.EmailAnalyzer(localLLM)
-            val analysisRepository = com.example.smartgmail.repository.EmailAnalysisRepository(
-                (context.applicationContext as com.example.smartgmail.SmartGmailApplication).database
-            )
+            android.widget.Toast.makeText(context, "Retrying ${failed.size} emails...", android.widget.Toast.LENGTH_SHORT).show()
+
+            val database = (context.applicationContext as com.example.smartgmail.SmartGmailApplication).database
+            val analysisRepository = com.example.smartgmail.repository.EmailAnalysisRepository(database)
 
             failed.forEach { inboxEmail ->
                 val emailEntity = emailRepository.getEmail(inboxEmail.id) ?: return@forEach
@@ -85,9 +87,15 @@ class InboxViewModel(
                 )
 
                 try {
-                    val analysis = analyzer.analyze(email)
+                    analysisRepository.saveAnalyzingStatus(email.id)
+                    
+                    val analysis = aiManager.runAnalysis { llm ->
+                        com.example.smartgmail.ai.EmailAnalyzer(llm).analyze(email)
+                    }
+                    
                     analysisRepository.saveAnalysis(analysis)
                 } catch (e: Exception) {
+                    Log.e("InboxViewModel", "Retry failed for ${email.id}", e)
                     analysisRepository.saveFailedAnalysis(email.id)
                 }
             }

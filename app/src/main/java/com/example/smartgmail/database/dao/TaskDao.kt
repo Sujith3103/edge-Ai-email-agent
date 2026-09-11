@@ -40,4 +40,15 @@ interface TaskDao {
 
     @Query("DELETE FROM tasks WHERE id = :taskId")
     suspend fun deleteTask(taskId: Long)
+
+    @Query("""
+        SELECT * FROM tasks 
+        WHERE completed = 0 
+        AND (description LIKE '%' || :query || '%' OR dueDate LIKE '%' || :query || '%')
+        LIMIT :limit
+    """)
+    suspend fun searchTasks(query: String, limit: Int = 5): List<TaskEntity>
+
+    @Query("SELECT * FROM tasks WHERE completed = 0 ORDER BY dueDate ASC, dueTime ASC LIMIT :limit")
+    suspend fun getUpcomingTasks(limit: Int = 5): List<TaskEntity>
 }

@@ -24,9 +24,9 @@ static std::string join(const std::vector<T> &values, const std::string &delim) 
 /**
  * LLama resources: context, model, batch and sampler
  */
-constexpr int   N_THREADS_MIN           = 2;
-constexpr int   N_THREADS_MAX           = 2;
-constexpr int   N_THREADS_HEADROOM      = 2;
+constexpr int   N_THREADS_MIN           = 4;
+constexpr int   N_THREADS_MAX           = 4;
+constexpr int   N_THREADS_HEADROOM      = 0;
 
 constexpr int   DEFAULT_CONTEXT_SIZE    = 16384;
 constexpr int   OVERFLOW_HEADROOM       = 4;
@@ -79,9 +79,7 @@ static llama_context *init_context(llama_model *model, const int n_ctx = DEFAULT
     }
 
     // Multi-threading setup
-    const int n_threads = std::max(N_THREADS_MIN, std::min(N_THREADS_MAX,
-                                                     (int) sysconf(_SC_NPROCESSORS_ONLN) -
-                                                     N_THREADS_HEADROOM));
+    const int n_threads = N_THREADS_MAX;
     LOGi("%s: Using %d threads", __func__, n_threads);
 
     // Context parameters setup

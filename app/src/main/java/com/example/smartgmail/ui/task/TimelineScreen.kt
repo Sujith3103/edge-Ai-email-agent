@@ -23,6 +23,7 @@ import com.example.smartgmail.database.entity.EventEntity
 import com.example.smartgmail.database.entity.TaskEntity
 import com.example.smartgmail.repository.EventRepository
 import com.example.smartgmail.repository.TaskRepository
+import com.example.smartgmail.ui.components.GlassCard
 
 @Composable
 fun TimelineScreen(
@@ -45,49 +46,49 @@ fun TimelineScreen(
             .groupBy { it.date ?: "No Date" }
     }
 
-    LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
-    ) {
-        item {
-            Text(
-                text = "Timeline",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(24.dp))
-        }
-
-        if (timelineItems.isEmpty()) {
+    Box(modifier = modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+            contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
+        ) {
             item {
-                Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Your timeline is empty", color = MaterialTheme.colorScheme.outline)
-                }
+                Text(
+                    text = "Timeline",
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White
+                )
+                Spacer(modifier = Modifier.height(24.dp))
             }
-        }
 
-        timelineItems.forEach { (date, items) ->
-            item {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-                    shape = MaterialTheme.shapes.small,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                ) {
-                    Text(
-                        text = date,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
+            if (timelineItems.isEmpty()) {
+                item {
+                    Box(modifier = Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("Your timeline is empty", color = Color.White.copy(alpha = 0.4f))
+                    }
                 }
             }
 
-            items(items) { item ->
-                TimelineNode(item)
+            timelineItems.forEach { (date, items) ->
+                item {
+                    Surface(
+                        color = Color(0xFF4285F4).copy(alpha = 0.2f),
+                        shape = CircleShape,
+                        modifier = Modifier.padding(bottom = 16.dp)
+                    ) {
+                        Text(
+                            text = date,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF4285F4),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+
+                items(items) { item ->
+                    TimelineNodeGlass(item)
+                }
             }
         }
     }
@@ -118,7 +119,7 @@ sealed class TimelineItem {
 }
 
 @Composable
-fun TimelineNode(item: TimelineItem) {
+fun TimelineNodeGlass(item: TimelineItem) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -133,7 +134,7 @@ fun TimelineNode(item: TimelineItem) {
                 text = item.time ?: "--:--",
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = Color.White.copy(alpha = 0.7f)
             )
         }
 
@@ -150,41 +151,29 @@ fun TimelineNode(item: TimelineItem) {
                     .size(12.dp)
                     .clip(CircleShape)
                     .background(
-                        if (item is TimelineItem.Event) MaterialTheme.colorScheme.primary 
-                        else MaterialTheme.colorScheme.secondary
+                        if (item is TimelineItem.Event) Color(0xFF4285F4)
+                        else Color(0xFF9334E6)
                     )
-                    .padding(2.dp)
-            ) {
-                Box(modifier = Modifier.fillMaxSize().clip(CircleShape).background(Color.White.copy(alpha = 0.3f)))
-            }
+            )
             
             // Vertical line
             Box(
                 modifier = Modifier
-                    .width(2.dp)
-                    .fillMaxHeight()
-                    .background(MaterialTheme.colorScheme.outlineVariant)
+                    .width(1.dp)
+                    .weight(1f)
+                    .background(Color.White.copy(alpha = 0.2f))
             )
         }
 
         // 3. Content Column
         Box(modifier = Modifier.padding(bottom = 24.dp, end = 8.dp).weight(1f)) {
-            ElevatedCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.medium,
-                colors = CardDefaults.elevatedCardColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+            GlassCard(modifier = Modifier.fillMaxWidth()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = if (item is TimelineItem.Event) Icons.Default.Event else Icons.Default.TaskAlt,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
-                        tint = if (item is TimelineItem.Event) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                        tint = if (item is TimelineItem.Event) Color(0xFF4285F4) else Color(0xFF9334E6)
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Column {
@@ -192,13 +181,13 @@ fun TimelineNode(item: TimelineItem) {
                             text = item.title,
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = Color.White
                         )
                         if (item.subtitle != null) {
                             Text(
                                 text = item.subtitle!!,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = Color.White.copy(alpha = 0.6f)
                             )
                         }
                     }

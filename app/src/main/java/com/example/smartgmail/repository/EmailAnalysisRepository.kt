@@ -24,6 +24,12 @@ class EmailAnalysisRepository(
         emailAnalysisDao.updateStatus(emailId, "ANALYZING")
     }
 
+    suspend fun updateKnowledgeRelevance(emailId: String, status: String) {
+        emailAnalysisDao.updateKnowledgeRelevance(emailId, status)
+    }
+
+    suspend fun getRelevantEmailIds(): List<String> = emailAnalysisDao.getRelevantEmailIds()
+
     suspend fun saveAnalysis(analysis: EmailAnalysis) {
         database.withTransaction {
             // 1. Handle Idempotency: Delete existing generated items for this email
@@ -38,24 +44,18 @@ class EmailAnalysisRepository(
                 actionItemsJson = serializeActionItems(analysis.actionItems),
                 deadlinesJson = serializeDeadlines(analysis.deadlines),
                 calendarEventsJson = serializeCalendarEvents(analysis.calendarEvents),
-                analysisStatus = "COMPLETED"
+                analysisStatus = "COMPLETED",
+                knowledgeRelevant = analysis.knowledgeRelevant
             )
             emailAnalysisDao.insertAnalysis(analysisEntity)
 
-            // 3. Normalize action items into TaskEntity
-            val tasks = analysis.actionItems.map { actionItem ->
-                // Intelligent deadline matching: 
-                // Check if any deadline description matches this action item
-                val matchedDeadline = analysis.deadlines.find { deadline ->
-                    actionItem.contains(deadline.description, ignoreCase = true) ||
-                            deadline.description.contains(actionItem, ignoreCase = true)
-                }
-
+            // 3. Normalize deadlines into TaskEntity
+            val tasks = analysis.deadlines.map { deadline ->
                 TaskEntity(
                     emailId = analysis.emailId,
-                    description = actionItem,
-                    dueDate = matchedDeadline?.date,
-                    dueTime = matchedDeadline?.time,
+                    description = deadline.description,
+                    dueDate = deadline.date,
+                    dueTime = deadline.time,
                     completed = false
                 )
             }

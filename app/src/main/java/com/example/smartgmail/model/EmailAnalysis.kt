@@ -11,7 +11,9 @@ data class EmailAnalysis(
 
     val deadlines: List<Deadline>,
 
-    val calendarEvents: List<CalendarEvent>
+    val calendarEvents: List<CalendarEvent>,
+
+    val knowledgeRelevant: String
 )
 
 enum class Priority {

@@ -15,5 +15,6 @@ data class InboxEmail(
 
     val priority: String?,
     val summary: String?,
-    val analysisStatus: String?
+    val analysisStatus: String?,
+    val knowledgeRelevant: String?
 )

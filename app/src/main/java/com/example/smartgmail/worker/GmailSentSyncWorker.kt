@@ -11,6 +11,13 @@ import com.example.smartgmail.gmail.GmailApi
 import com.example.smartgmail.gmail.GmailApiException
 import com.example.smartgmail.gmail.GmailMessageParser
 import com.example.smartgmail.repository.TaskRepository
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.pm.ServiceInfo
+import android.os.Build
+import androidx.core.app.NotificationCompat
+import androidx.work.ForegroundInfo
+import com.example.smartgmail.R
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
@@ -24,8 +31,46 @@ class GmailSentSyncWorker(
 
     override suspend fun doWork(): Result {
         val app = applicationContext as SmartGmailApplication
+        
+        try {
+            setForeground(getForegroundInfo("Syncing sent emails..."))
+        } catch (e: Exception) {
+            Log.e("GmailSentSyncWorker", "Failed to set foreground", e)
+        }
+
         return app.syncMutex.withLock {
             syncInternal(app)
+        }
+    }
+
+    private fun getForegroundInfo(progress: String): ForegroundInfo {
+        val channelId = "gmail_sent_sync_channel"
+        val notificationId = 1002
+
+        val context = applicationContext
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId,
+                "Sent Sync",
+                NotificationManager.IMPORTANCE_LOW
+            )
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val notification = NotificationCompat.Builder(context, channelId)
+            .setContentTitle("Syncing Sent Mails")
+            .setTicker("Syncing Sent Mails")
+            .setContentText(progress)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setOngoing(true)
+            .build()
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ForegroundInfo(notificationId, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            ForegroundInfo(notificationId, notification)
         }
     }
 
@@ -86,6 +131,10 @@ class GmailSentSyncWorker(
                     val email = GmailMessageParser.parse(rawMessage)
 
                     // AI Workflow to check task completion
+                    try {
+                        setForeground(getForegroundInfo("Checking completion: ${email.subject.take(30)}..."))
+                    } catch (e: Exception) {}
+
                     val completedTaskIds = app.aiManager.runAnalysis { llm ->
                         val analyzer = EmailAnalyzer(llm)
                         analyzer.analyzeSentEmail(email, pendingTasks)

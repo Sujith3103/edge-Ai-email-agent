@@ -48,7 +48,8 @@ interface EmailDao {
             e.body,
             a.priority,
             a.summary,
-            a.analysisStatus
+            a.analysisStatus,
+            a.knowledgeRelevant
         FROM emails e
         LEFT JOIN email_analysis a
             ON e.id = a.emailId
@@ -68,7 +69,8 @@ interface EmailDao {
             e.body,
             a.priority,
             a.summary,
-            a.analysisStatus
+            a.analysisStatus,
+            a.knowledgeRelevant
         FROM emails e
         LEFT JOIN email_analysis a
             ON e.id = a.emailId
@@ -88,7 +90,8 @@ interface EmailDao {
             e.body,
             a.priority,
             a.summary,
-            a.analysisStatus
+            a.analysisStatus,
+            a.knowledgeRelevant
         FROM emails e
         LEFT JOIN email_analysis a
             ON e.id = a.emailId
@@ -112,4 +115,26 @@ interface EmailDao {
     suspend fun emailExists(
         emailId: String
     ): Boolean
+
+    @Query("""
+        SELECT
+            e.id,
+            e.threadId,
+            e.sender,
+            e.recipient,
+            e.subject,
+            e.date,
+            e.body,
+            a.priority,
+            a.summary,
+            a.analysisStatus,
+            a.knowledgeRelevant
+        FROM emails e
+        LEFT JOIN email_analysis a
+            ON e.id = a.emailId
+        WHERE e.isDeleted = 0 
+        AND (e.subject LIKE '%' || :query || '%' OR e.body LIKE '%' || :query || '%' OR e.sender LIKE '%' || :query || '%')
+        LIMIT :limit
+    """)
+    suspend fun searchEmails(query: String, limit: Int = 5): List<InboxEmail>
 }

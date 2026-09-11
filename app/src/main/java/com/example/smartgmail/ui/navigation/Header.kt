@@ -32,14 +32,17 @@ fun SmartGmailHeader(
         IconButton(onClick = onMenuClick) {
             Icon(
                 imageVector = Icons.Default.Menu,
-                contentDescription = "Menu"
+                contentDescription = "Menu",
+                tint = androidx.compose.ui.graphics.Color.White
             )
         }
 
         Text(
             text = "Brill Mail",
             modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.titleLarge
+            style = MaterialTheme.typography.titleLarge,
+            color = androidx.compose.ui.graphics.Color.White,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Black
         )
 
         IconButton(
@@ -49,7 +52,8 @@ fun SmartGmailHeader(
         ) {
             Icon(
                 imageVector = Icons.Default.Refresh,
-                contentDescription = "Refresh"
+                contentDescription = "Refresh",
+                tint = androidx.compose.ui.graphics.Color.White
             )
         }
     }

@@ -19,5 +19,7 @@ data class EmailAnalysisEntity(
 
     val calendarEventsJson: String,
 
-    val analysisStatus: String
+    val analysisStatus: String,
+
+    val knowledgeRelevant: String = "NOT_ANALYZED"
 )

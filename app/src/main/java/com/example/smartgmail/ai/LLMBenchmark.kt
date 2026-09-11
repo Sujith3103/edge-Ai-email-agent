@@ -25,7 +25,7 @@ suspend fun runLLMBenchmark(localLLM: LocalLLM) {
     // =========================================================
 
     val promptTests = listOf(
-       500,1000,2000,3000,4000
+       4000,5000,6000,7000,8000
     )
 
     Log.d(

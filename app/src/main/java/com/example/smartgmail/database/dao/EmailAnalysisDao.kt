@@ -26,11 +26,17 @@ interface EmailAnalysisDao {
         emailId: String
     ): EmailAnalysisEntity?
 
-    @Query("INSERT OR IGNORE INTO email_analysis (emailId, priority, summary, actionItemsJson, deadlinesJson, calendarEventsJson, analysisStatus) VALUES (:emailId, 'LOW', '', '[]', '[]', '[]', 'ANALYZING')")
+    @Query("INSERT OR IGNORE INTO email_analysis (emailId, priority, summary, actionItemsJson, deadlinesJson, calendarEventsJson, analysisStatus, knowledgeRelevant) VALUES (:emailId, 'LOW', '', '[]', '[]', '[]', 'ANALYZING', 'NOT_ANALYZED')")
     suspend fun insertAnalyzingStatus(emailId: String)
 
     @Query("UPDATE email_analysis SET analysisStatus = :status WHERE emailId = :emailId")
     suspend fun updateStatus(emailId: String, status: String)
+
+    @Query("UPDATE email_analysis SET knowledgeRelevant = :status WHERE emailId = :emailId")
+    suspend fun updateKnowledgeRelevance(emailId: String, status: String)
+
+    @Query("SELECT emailId FROM email_analysis WHERE knowledgeRelevant = 'RELEVANT'")
+    suspend fun getRelevantEmailIds(): List<String>
 
     @Query(
         "SELECT * FROM email_analysis"

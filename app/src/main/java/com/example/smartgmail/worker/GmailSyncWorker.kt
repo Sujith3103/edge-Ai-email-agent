@@ -12,6 +12,13 @@ import com.example.smartgmail.gmail.GmailApiException
 import com.example.smartgmail.gmail.GmailMessageParser
 import com.example.smartgmail.repository.EmailRepository
 import com.example.smartgmail.repository.EmailAnalysisRepository
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.pm.ServiceInfo
+import android.os.Build
+import androidx.core.app.NotificationCompat
+import androidx.work.ForegroundInfo
+import com.example.smartgmail.R
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 
@@ -27,8 +34,47 @@ class GmailSyncWorker(
 
     override suspend fun doWork(): Result {
         val app = applicationContext as SmartGmailApplication
+        
+        // Mark the worker as a foreground service to prevent the system from killing it during LLM work
+        try {
+            setForeground(getForegroundInfo("Starting Gmail Sync..."))
+        } catch (e: Exception) {
+            Log.e("GmailSyncWorker", "Failed to set foreground", e)
+        }
+
         return app.syncMutex.withLock {
             syncInternal(app)
+        }
+    }
+
+    private fun getForegroundInfo(progress: String): ForegroundInfo {
+        val channelId = "gmail_sync_channel"
+        val notificationId = 1001
+
+        val context = applicationContext
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId,
+                "Gmail Sync",
+                NotificationManager.IMPORTANCE_LOW
+            )
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val notification = NotificationCompat.Builder(context, channelId)
+            .setContentTitle("Syncing SmartGmail")
+            .setTicker("Syncing SmartGmail")
+            .setContentText(progress)
+            .setSmallIcon(R.mipmap.ic_launcher) // Use default icon
+            .setOngoing(true)
+            .build()
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ForegroundInfo(notificationId, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            ForegroundInfo(notificationId, notification)
         }
     }
 
@@ -39,6 +85,10 @@ class GmailSyncWorker(
 
         try {
             val aiManager = app.aiManager
+            
+            // Ensure AI is initialized before starting
+            aiManager.initialize()
+            
             val database = app.database
             val emailRepository = EmailRepository(database.emailDao())
             val emailAnalysisRepository = EmailAnalysisRepository(database)
@@ -217,6 +267,11 @@ class GmailSyncWorker(
                     // -----------------------------------------
 
                     try {
+                        // Update progress in notification
+                        try {
+                            setForeground(getForegroundInfo("Analyzing: ${email.subject.take(30)}..."))
+                        } catch (e: Exception) {}
+
                         emailAnalysisRepository.saveAnalyzingStatus(email.id)
 
                         val analyzedEmail = app.aiManager.runAnalysis { llm ->
@@ -227,6 +282,20 @@ class GmailSyncWorker(
                         emailAnalysisRepository.saveAnalysis(
                             analyzedEmail
                         )
+
+                        // -----------------------------------------
+                        // SECOND STAGE: KNOWLEDGE RELEVANCE
+                        // -----------------------------------------
+                        try {
+                            val knowledgeStatus = app.aiManager.runAnalysis { llm ->
+                                val analyzer = EmailAnalyzer(llm)
+                                analyzer.analyzeKnowledgeRelevance(email)
+                            }
+                            emailAnalysisRepository.updateKnowledgeRelevance(email.id, knowledgeStatus)
+                            Log.d("workflow", "KNOWLEDGE ANALYSIS COMPLETE: ${email.id} -> $knowledgeStatus")
+                        } catch (e: Exception) {
+                            Log.e("workflow", "KNOWLEDGE ANALYSIS FAILED: ${email.id}", e)
+                        }
 
                         Log.d(
                             "workflow",

@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -15,6 +16,7 @@ fun GmailMenu(
     expanded: Boolean,
     onDismiss: () -> Unit,
     onSyncClick: () -> Unit,
+    onKnowledgeExtractionClick: () -> Unit,
     onSettingsClick: () -> Unit,
     onAboutClick: () -> Unit
 ) {
@@ -37,6 +39,22 @@ fun GmailMenu(
             onClick = {
                 onDismiss()
                 onSyncClick()
+            }
+        )
+
+        DropdownMenuItem(
+            text = {
+                Text("Extract Knowledge")
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = null
+                )
+            },
+            onClick = {
+                onDismiss()
+                onKnowledgeExtractionClick()
             }
         )
 
